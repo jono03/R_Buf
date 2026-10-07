@@ -30,6 +30,11 @@ int main(){
       dataBufMapPtr->dataBuf[e].logicalSliceAddr=lsa; PutToDataBufHashList(e); }
     if(code==REQ_CODE_WRITE){ assert(!RBUF_ENABLE || !dataBufMapPtr->dataBuf[e].inReadList); dataBufMapPtr->dataBuf[e].dirty=DATA_BUF_DIRTY; }
     else if(RBUF_ENABLE && dataBufMapPtr->dataBuf[e].inReadList) assert(!dataBufMapPtr->dataBuf[e].dirty);
+    if(code==REQ_CODE_WRITE){ /* read-after-write on the same LSA must hit the dirty write-list entry */
+      reqPoolPtr->reqPool[0].reqCode=REQ_CODE_READ; unsigned h=CheckDataBufHit(0);
+      assert(h==e); assert(dataBufMapPtr->dataBuf[h].dirty==DATA_BUF_DIRTY);
+      assert(!RBUF_ENABLE || !dataBufMapPtr->dataBuf[h].inReadList);
+    }
     if(it%1000==0) check();
   }
   check(); printf("RBUF_ENABLE=%d ok readAlloc=%u writeHitInval=%u\n",RBUF_ENABLE,rbufReadAllocCnt,rbufWriteHitInvalidateCnt); return 0; }
