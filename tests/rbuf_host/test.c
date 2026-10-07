@@ -2,6 +2,11 @@
 #include <string.h>
 #include <assert.h>
 #include "memory_map.h"
+#if (VERIFY_PRINT == 1)
+#define MAYBE_PRINT() MaybePrintBufCounters()
+#else
+#define MAYBE_PRINT()
+#endif
 extern P_DATA_BUF_HASH_TABLE dataBufHashTablePtr;
 unsigned char mem[1<<20]; REQPOOL pool; REQPOOL *reqPoolPtr=&pool;
 static void check(void){
@@ -23,6 +28,7 @@ int main(){
   InitDataBuf(); check(); srand(1);
   for(int it=0;it<200000;it++){
     unsigned lsa=rand()%100, code=(rand()%2)?REQ_CODE_READ:REQ_CODE_WRITE;
+    MAYBE_PRINT();
     reqPoolPtr->reqPool[0].logicalSliceAddr=lsa; reqPoolPtr->reqPool[0].reqCode=code;
     unsigned e=CheckDataBufHit(0);
     if(e==DATA_BUF_FAIL){ e=AllocateDataBuf(code);
@@ -37,4 +43,4 @@ int main(){
     }
     if(it%1000==0) check();
   }
-  check(); printf("RBUF_ENABLE=%d ok readAlloc=%u writeHitInval=%u\n",RBUF_ENABLE,rbufReadAllocCnt,rbufWriteHitInvalidateCnt); return 0; }
+  MAYBE_PRINT(); check(); printf("RBUF_ENABLE=%d ok readAlloc=%u writeHitInval=%u\n",RBUF_ENABLE,rbufReadAllocCnt,rbufWriteHitInvalidateCnt); return 0; }

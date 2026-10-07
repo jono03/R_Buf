@@ -45,6 +45,7 @@
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Add R-Buf entry flag, read LRU list and counters
 //   - RBUF_ENTRY_COUNT can be overridden in ftl_config.h
+//   - Add eviction counters and VERIFY_PRINT counter output
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -126,6 +127,11 @@ extern DATA_BUF_LRU_LIST dataBufLruList;
 extern DATA_BUF_LRU_LIST rbufLruList;
 extern unsigned int rbufReadAllocCnt;
 extern unsigned int rbufWriteHitInvalidateCnt;
+extern unsigned int bufEvictCnt;		//dirty entries written back on allocation (all requests)
+extern unsigned int bufReadEvictCnt;	//... caused by a read request (must stay 0 with R-Buf)
+#if (VERIFY_PRINT == 1)
+void MaybePrintBufCounters(void);
+#endif
 extern P_DATA_BUF_HASH_TABLE dataBufHashTable;
 extern P_TEMPORARY_DATA_BUF_MAP tempDataBufMapPtr;
 

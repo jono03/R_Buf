@@ -45,6 +45,7 @@
 //
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Add RBUF_ENABLE configuration switch
+//   - Add RBUF_ENTRY_COUNT, TRACE_ENABLE, VERIFY_PRINT
 //////////////////////////////////////////////////////////////////////////////////
 
 #ifndef FTL_CONFIG_H_
@@ -64,6 +65,17 @@
 //original paper ratio is 1 x USER_DIES; larger values give reads more parallelism
 #ifndef RBUF_ENTRY_COUNT
 #define RBUF_ENTRY_COUNT	(1 * USER_DIES)
+#endif
+
+//TRACE_ENABLE: per-request read trace log (not implemented yet, keep 0)
+#ifndef TRACE_ENABLE
+#define TRACE_ENABLE	0
+#endif
+
+//VERIFY_PRINT: 1 = print buffer counters over UART every 10 s (verification builds only).
+//measurement builds must keep 0 (no UART output while running)
+#ifndef VERIFY_PRINT
+#define VERIFY_PRINT	0
 #endif
 
 //checks NSC connection, initializes base address

@@ -44,7 +44,7 @@
 //
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Add optional R-Buf: split the LRU list into read/write lists (RBUF_ENABLE)
-//   - Print R-Buf status at boot and every 65536 read allocations
+//   - Boot banner, eviction counters, VERIFY_PRINT counter output (no UART output in measurement builds)
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -58,6 +58,8 @@ DATA_BUF_LRU_LIST dataBufLruList;
 DATA_BUF_LRU_LIST rbufLruList;
 unsigned int rbufReadAllocCnt;
 unsigned int rbufWriteHitInvalidateCnt;
+unsigned int bufEvictCnt;
+unsigned int bufReadEvictCnt;
 P_DATA_BUF_HASH_TABLE dataBufHashTablePtr;
 P_TEMPORARY_DATA_BUF_MAP tempDataBufMapPtr;
 
@@ -107,11 +109,9 @@ void InitDataBuf()
 	for(bufEntry = 0; bufEntry < AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT; bufEntry++)
 		tempDataBufMapPtr->tempDataBuf[bufEntry].blockingReqTail =  REQ_SLOT_TAG_NONE;
 
-#if (RBUF_ENABLE == 1)
-	xil_printf("[ R-Buf ON: read entries %d of %d ]\r\n", RBUF_ENTRY_COUNT, AVAILABLE_DATA_BUFFER_ENTRY_COUNT);
-#else
-	xil_printf("[ R-Buf OFF ]\r\n");
-#endif
+	//boot banner (spec D3): one line with the build switches
+	xil_printf("[ RBUF=%d RBUF_ENTRIES=%d/%d TRACE=%d VERIFY=%d ]\r\n", RBUF_ENABLE,
+		RBUF_ENABLE ? RBUF_ENTRY_COUNT : 0, AVAILABLE_DATA_BUFFER_ENTRY_COUNT, TRACE_ENABLE, VERIFY_PRINT);
 }
 
 //LRU list that the entry belongs to (always the write/unified list when R-Buf is disabled)
@@ -223,8 +223,6 @@ unsigned int AllocateDataBuf(unsigned int reqCode)
 	{
 		list = &rbufLruList;
 		rbufReadAllocCnt++;
-		if((rbufReadAllocCnt & 0xFFFF) == 0)
-			xil_printf("[ R-Buf read alloc=%u write-hit-invalidate=%u ]\r\n", rbufReadAllocCnt, rbufWriteHitInvalidateCnt);
 	}
 #endif
 
@@ -337,3 +335,28 @@ void SelectiveGetFromDataBufHashList(unsigned int bufEntry)
 
 
 
+
+
+#if (VERIFY_PRINT == 1)
+#include "xtime_l.h"
+//verification builds only: print the counters at most every 10 s, when they changed
+void MaybePrintBufCounters(void)
+{
+	static XTime nextPrint = 0;
+	static unsigned int lastSum = 0;
+	XTime now;
+	unsigned int sum;
+
+	XTime_GetTime(&now);
+	if(now < nextPrint)
+		return;
+	nextPrint = now + (XTime)10 * COUNTS_PER_SECOND;
+
+	sum = rbufReadAllocCnt + rbufWriteHitInvalidateCnt + bufEvictCnt + bufReadEvictCnt;
+	if(sum == lastSum)
+		return;
+	lastSum = sum;
+	xil_printf("[ CNT readAlloc=%u invalidate=%u evict=%u readEvict=%u ]\r\n",
+		rbufReadAllocCnt, rbufWriteHitInvalidateCnt, bufEvictCnt, bufReadEvictCnt);
+}
+#endif

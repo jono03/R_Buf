@@ -47,6 +47,7 @@
 //
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Pass reqCode to AllocateDataBuf() for R-Buf
+//   - Count write-backs caused by reads (bufReadEvictCnt), VERIFY_PRINT hook
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -169,6 +170,11 @@ void EvictDataBufEntry(unsigned int originReqSlotTag)
 	dataBufEntry = reqPoolPtr->reqPool[originReqSlotTag].dataBufInfo.entry;
 	if(dataBufMapPtr->dataBuf[dataBufEntry].dirty == DATA_BUF_DIRTY)
 	{
+		//counters: with R-Buf a read must never cause a write-back of a dirty entry
+		bufEvictCnt++;
+		if(reqPoolPtr->reqPool[originReqSlotTag].reqCode == REQ_CODE_READ)
+			bufReadEvictCnt++;
+
 		reqSlotTag = GetFromFreeReqQ();
 		virtualSliceAddr =  AddrTransWrite(dataBufMapPtr->dataBuf[dataBufEntry].logicalSliceAddr);
 
@@ -228,6 +234,9 @@ void ReqTransSliceToLowLevel()
 
 	while(sliceReqQ.headReq != REQ_SLOT_TAG_NONE)
 	{
+#if (VERIFY_PRINT == 1)
+		MaybePrintBufCounters();
+#endif
 		reqSlotTag = GetFromSliceReqQ();
 		if(reqSlotTag == REQ_SLOT_TAG_FAIL)
 			return ;
