@@ -44,6 +44,9 @@
 //
 // * v1.0.0
 //   - First draft
+//
+// * v1.1.0 (2026-10-07, R_Buf project)
+//   - Pass reqCode to AllocateDataBuf() for R-Buf
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -239,7 +242,7 @@ void ReqTransSliceToLowLevel()
 		else
 		{
 			//data buffer miss, allocate a new buffer entry
-			dataBufEntry = AllocateDataBuf();
+			dataBufEntry = AllocateDataBuf(reqPoolPtr->reqPool[reqSlotTag].reqCode);
 			reqPoolPtr->reqPool[reqSlotTag].dataBufInfo.entry = dataBufEntry;
 
 			//clear the allocated data buffer entry being used by a previous request

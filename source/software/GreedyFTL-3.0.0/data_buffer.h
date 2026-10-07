@@ -41,6 +41,9 @@
 //
 // * v1.0.0
 //   - First draft
+//
+// * v1.1.0 (2026-10-07, R_Buf project)
+//   - Add R-Buf entry flag, read LRU list and counters
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -51,6 +54,9 @@
 
 #define AVAILABLE_DATA_BUFFER_ENTRY_COUNT				(16 * USER_DIES)
 #define AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT		(USER_DIES)
+
+//R-Buf (see ftl_config.h RBUF_ENABLE): read buffer = 1 entry per die, taken out of the same entry array
+#define RBUF_ENTRY_COUNT								(1 * USER_DIES)
 
 #define DATA_BUF_NONE	0xffff
 #define DATA_BUF_FAIL	0xffff
@@ -68,7 +74,8 @@ typedef struct _DATA_BUF_ENTRY {
 	unsigned int hashPrevEntry : 16;
 	unsigned int hashNextEntry : 16;
 	unsigned int dirty : 1;
-	unsigned int reserved0 : 15;
+	unsigned int inReadList : 1;
+	unsigned int reserved0 : 14;
 } DATA_BUF_ENTRY, *P_DATA_BUF_ENTRY;
 
 typedef struct _DATA_BUF_MAP{
@@ -102,7 +109,7 @@ typedef struct _TEMPORARY_DATA_BUF_MAP{
 
 void InitDataBuf();
 unsigned int CheckDataBufHit(unsigned int reqSlotTag);
-unsigned int AllocateDataBuf();
+unsigned int AllocateDataBuf(unsigned int reqCode);
 void UpdateDataBufEntryInfoBlockingReq(unsigned int bufEntry, unsigned int reqSlotTag);
 
 unsigned int AllocateTempDataBuf(unsigned int dieNo);
@@ -113,6 +120,9 @@ void SelectiveGetFromDataBufHashList(unsigned int bufEntry);
 
 extern P_DATA_BUF_MAP dataBufMapPtr;
 extern DATA_BUF_LRU_LIST dataBufLruList;
+extern DATA_BUF_LRU_LIST rbufLruList;
+extern unsigned int rbufReadAllocCnt;
+extern unsigned int rbufWriteHitInvalidateCnt;
 extern P_DATA_BUF_HASH_TABLE dataBufHashTable;
 extern P_TEMPORARY_DATA_BUF_MAP tempDataBufMapPtr;
 

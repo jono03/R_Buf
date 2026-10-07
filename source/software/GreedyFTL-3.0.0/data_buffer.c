@@ -41,6 +41,9 @@
 //
 // * v1.0.0
 //   - First draft
+//
+// * v1.1.0 (2026-10-07, R_Buf project)
+//   - Add optional R-Buf: split the LRU list into read/write lists (RBUF_ENABLE)
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -51,6 +54,9 @@
 
 P_DATA_BUF_MAP dataBufMapPtr;
 DATA_BUF_LRU_LIST dataBufLruList;
+DATA_BUF_LRU_LIST rbufLruList;
+unsigned int rbufReadAllocCnt;
+unsigned int rbufWriteHitInvalidateCnt;
 P_DATA_BUF_HASH_TABLE dataBufHashTablePtr;
 P_TEMPORARY_DATA_BUF_MAP tempDataBufMapPtr;
 
@@ -76,18 +82,92 @@ void InitDataBuf()
 		dataBufMapPtr->dataBuf[bufEntry].hashNextEntry = DATA_BUF_NONE;
 	}
 
+#if (RBUF_ENABLE == 1)
+	//R-Buf: the first RBUF_ENTRY_COUNT entries form the read list, the rest the write list
+	for(bufEntry = 0; bufEntry < AVAILABLE_DATA_BUFFER_ENTRY_COUNT; bufEntry++)
+		dataBufMapPtr->dataBuf[bufEntry].inReadList = (bufEntry < RBUF_ENTRY_COUNT);
+
+	dataBufMapPtr->dataBuf[0].prevEntry = DATA_BUF_NONE;
+	dataBufMapPtr->dataBuf[RBUF_ENTRY_COUNT - 1].nextEntry = DATA_BUF_NONE;
+	rbufLruList.headEntry = 0;
+	rbufLruList.tailEntry = RBUF_ENTRY_COUNT - 1;
+
+	dataBufMapPtr->dataBuf[RBUF_ENTRY_COUNT].prevEntry = DATA_BUF_NONE;
+	dataBufMapPtr->dataBuf[AVAILABLE_DATA_BUFFER_ENTRY_COUNT - 1].nextEntry = DATA_BUF_NONE;
+	dataBufLruList.headEntry = RBUF_ENTRY_COUNT;
+	dataBufLruList.tailEntry = AVAILABLE_DATA_BUFFER_ENTRY_COUNT - 1;
+#else
 	dataBufMapPtr->dataBuf[0].prevEntry = DATA_BUF_NONE;
 	dataBufMapPtr->dataBuf[AVAILABLE_DATA_BUFFER_ENTRY_COUNT - 1].nextEntry = DATA_BUF_NONE;
 	dataBufLruList.headEntry = 0 ;
 	dataBufLruList.tailEntry = AVAILABLE_DATA_BUFFER_ENTRY_COUNT - 1;
+#endif
 
 	for(bufEntry = 0; bufEntry < AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT; bufEntry++)
 		tempDataBufMapPtr->tempDataBuf[bufEntry].blockingReqTail =  REQ_SLOT_TAG_NONE;
 }
 
+//LRU list that the entry belongs to (always the write/unified list when R-Buf is disabled)
+static DATA_BUF_LRU_LIST* LruListOf(unsigned int bufEntry)
+{
+#if (RBUF_ENABLE == 1)
+	if(dataBufMapPtr->dataBuf[bufEntry].inReadList)
+		return &rbufLruList;
+#endif
+	return &dataBufLruList;
+}
+
+static void RemoveFromLru(DATA_BUF_LRU_LIST* list, unsigned int bufEntry)
+{
+	unsigned int prev = dataBufMapPtr->dataBuf[bufEntry].prevEntry;
+	unsigned int next = dataBufMapPtr->dataBuf[bufEntry].nextEntry;
+
+	if(prev != DATA_BUF_NONE)
+		dataBufMapPtr->dataBuf[prev].nextEntry = next;
+	else
+		list->headEntry = next;
+
+	if(next != DATA_BUF_NONE)
+		dataBufMapPtr->dataBuf[next].prevEntry = prev;
+	else
+		list->tailEntry = prev;
+
+	dataBufMapPtr->dataBuf[bufEntry].prevEntry = DATA_BUF_NONE;
+	dataBufMapPtr->dataBuf[bufEntry].nextEntry = DATA_BUF_NONE;
+}
+
+static void PushToLruHead(DATA_BUF_LRU_LIST* list, unsigned int bufEntry)
+{
+	dataBufMapPtr->dataBuf[bufEntry].prevEntry = DATA_BUF_NONE;
+	dataBufMapPtr->dataBuf[bufEntry].nextEntry = list->headEntry;
+
+	if(list->headEntry != DATA_BUF_NONE)
+		dataBufMapPtr->dataBuf[list->headEntry].prevEntry = bufEntry;
+	else
+		list->tailEntry = bufEntry;
+
+	list->headEntry = bufEntry;
+}
+
+#if (RBUF_ENABLE == 1)
+static void PushToLruTail(DATA_BUF_LRU_LIST* list, unsigned int bufEntry)
+{
+	dataBufMapPtr->dataBuf[bufEntry].nextEntry = DATA_BUF_NONE;
+	dataBufMapPtr->dataBuf[bufEntry].prevEntry = list->tailEntry;
+
+	if(list->tailEntry != DATA_BUF_NONE)
+		dataBufMapPtr->dataBuf[list->tailEntry].nextEntry = bufEntry;
+	else
+		list->headEntry = bufEntry;
+
+	list->tailEntry = bufEntry;
+}
+#endif
+
 unsigned int CheckDataBufHit(unsigned int reqSlotTag)
 {
 	unsigned int bufEntry, logicalSliceAddr;
+	DATA_BUF_LRU_LIST* list;
 
 	logicalSliceAddr = reqPoolPtr->reqPool[reqSlotTag].logicalSliceAddr;
 	bufEntry = dataBufHashTablePtr->dataBufHash[FindDataBufHashTableEntry(logicalSliceAddr)].headEntry;
@@ -96,41 +176,25 @@ unsigned int CheckDataBufHit(unsigned int reqSlotTag)
 	{
 		if(dataBufMapPtr->dataBuf[bufEntry].logicalSliceAddr == logicalSliceAddr)
 		{
-			if((dataBufMapPtr->dataBuf[bufEntry].nextEntry != DATA_BUF_NONE) && (dataBufMapPtr->dataBuf[bufEntry].prevEntry != DATA_BUF_NONE))
-			{
-				dataBufMapPtr->dataBuf[dataBufMapPtr->dataBuf[bufEntry].prevEntry].nextEntry = dataBufMapPtr->dataBuf[bufEntry].nextEntry;
-				dataBufMapPtr->dataBuf[dataBufMapPtr->dataBuf[bufEntry].nextEntry].prevEntry = dataBufMapPtr->dataBuf[bufEntry].prevEntry;
-			}
-			else if((dataBufMapPtr->dataBuf[bufEntry].nextEntry == DATA_BUF_NONE) && (dataBufMapPtr->dataBuf[bufEntry].prevEntry != DATA_BUF_NONE))
-			{
-				dataBufMapPtr->dataBuf[dataBufMapPtr->dataBuf[bufEntry].prevEntry].nextEntry = DATA_BUF_NONE;
-				dataBufLruList.tailEntry = dataBufMapPtr->dataBuf[bufEntry].prevEntry;
-			}
-			else if((dataBufMapPtr->dataBuf[bufEntry].nextEntry != DATA_BUF_NONE) && (dataBufMapPtr->dataBuf[bufEntry].prevEntry== DATA_BUF_NONE))
-			{
-				dataBufMapPtr->dataBuf[dataBufMapPtr->dataBuf[bufEntry].nextEntry].prevEntry  = DATA_BUF_NONE;
-				dataBufLruList.headEntry = dataBufMapPtr->dataBuf[bufEntry].nextEntry;
-			}
-			else
-			{
-				dataBufLruList.tailEntry = DATA_BUF_NONE;
-				dataBufLruList.headEntry = DATA_BUF_NONE;
-			}
+			//LRU update stays inside the list the entry belongs to
+			list = LruListOf(bufEntry);
+			RemoveFromLru(list, bufEntry);
+			PushToLruHead(list, bufEntry);
 
-			if(dataBufLruList.headEntry != DATA_BUF_NONE)
+#if (RBUF_ENABLE == 1)
+			if(dataBufMapPtr->dataBuf[bufEntry].inReadList &&
+				reqPoolPtr->reqPool[reqSlotTag].reqCode == REQ_CODE_WRITE)
 			{
-				dataBufMapPtr->dataBuf[bufEntry].prevEntry = DATA_BUF_NONE;
-				dataBufMapPtr->dataBuf[bufEntry].nextEntry = dataBufLruList.headEntry;
-				dataBufMapPtr->dataBuf[dataBufLruList.headEntry].prevEntry = bufEntry;
-				dataBufLruList.headEntry = bufEntry;
+				//a write must not dirty a read-buffer entry: discard the (clean) copy,
+				//the write then proceeds as a miss and takes an entry from the write list
+				SelectiveGetFromDataBufHashList(bufEntry);
+				dataBufMapPtr->dataBuf[bufEntry].logicalSliceAddr = LSA_NONE;
+				RemoveFromLru(list, bufEntry);
+				PushToLruTail(list, bufEntry);
+				rbufWriteHitInvalidateCnt++;
+				return DATA_BUF_FAIL;
 			}
-			else
-			{
-				dataBufMapPtr->dataBuf[bufEntry].prevEntry = DATA_BUF_NONE;
-				dataBufMapPtr->dataBuf[bufEntry].nextEntry = DATA_BUF_NONE;
-				dataBufLruList.headEntry = bufEntry;
-				dataBufLruList.tailEntry = bufEntry;
-			}
+#endif
 
 			return bufEntry;
 		}
@@ -141,31 +205,33 @@ unsigned int CheckDataBufHit(unsigned int reqSlotTag)
 	return DATA_BUF_FAIL;
 }
 
-unsigned int AllocateDataBuf()
+unsigned int AllocateDataBuf(unsigned int reqCode)
 {
-	unsigned int evictedEntry = dataBufLruList.tailEntry;
+	DATA_BUF_LRU_LIST* list = &dataBufLruList;
+	unsigned int evictedEntry;
+
+#if (RBUF_ENABLE == 1)
+	//reads take victims from the read list only, writes from the write list only
+	if(reqCode == REQ_CODE_READ)
+	{
+		list = &rbufLruList;
+		rbufReadAllocCnt++;
+	}
+#endif
+
+	evictedEntry = list->tailEntry;
 
 	if(evictedEntry == DATA_BUF_NONE)
 		assert(!"[WARNING] There is no valid buffer entry [WARNING]");
 
-	if(dataBufMapPtr->dataBuf[evictedEntry].prevEntry != DATA_BUF_NONE)
-	{
-		dataBufMapPtr->dataBuf[dataBufMapPtr->dataBuf[evictedEntry].prevEntry].nextEntry = DATA_BUF_NONE;
-		dataBufLruList.tailEntry = dataBufMapPtr->dataBuf[evictedEntry].prevEntry;
+	RemoveFromLru(list, evictedEntry);
+	PushToLruHead(list, evictedEntry);
 
-		dataBufMapPtr->dataBuf[evictedEntry].prevEntry = DATA_BUF_NONE;
-		dataBufMapPtr->dataBuf[evictedEntry].nextEntry = dataBufLruList.headEntry;
-		dataBufMapPtr->dataBuf[dataBufLruList.headEntry].prevEntry = evictedEntry;
-		dataBufLruList.headEntry = evictedEntry;
-
-	}
-	else
-	{
-		dataBufMapPtr->dataBuf[evictedEntry].prevEntry = DATA_BUF_NONE;
-		dataBufMapPtr->dataBuf[evictedEntry].nextEntry = DATA_BUF_NONE;
-		dataBufLruList.headEntry = evictedEntry;
-		dataBufLruList.tailEntry = evictedEntry;
-	}
+#if (RBUF_ENABLE == 1)
+	//read-buffer entries are always clean, so a read never waits for an eviction write
+	if(list == &rbufLruList)
+		assert(dataBufMapPtr->dataBuf[evictedEntry].dirty == DATA_BUF_CLEAN);
+#endif
 
 	SelectiveGetFromDataBufHashList(evictedEntry);
 

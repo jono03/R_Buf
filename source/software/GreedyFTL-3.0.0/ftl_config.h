@@ -42,6 +42,9 @@
 //
 // * v1.0.0
 //   - First draft
+//
+// * v1.1.0 (2026-10-07, R_Buf project)
+//   - Add RBUF_ENABLE configuration switch
 //////////////////////////////////////////////////////////////////////////////////
 
 #ifndef FTL_CONFIG_H_
@@ -50,6 +53,12 @@
 #include "nsc_driver.h"
 #include "xparameters.h"
 #include "nvme/nvme.h"
+
+//R-Buf switch: 0 = original shared buffer (S-Buf), 1 = read/write separated LRU lists (R-Buf)
+//can be overridden at build time with -DRBUF_ENABLE=1
+#ifndef RBUF_ENABLE
+#define RBUF_ENABLE	0
+#endif
 
 //checks NSC connection, initializes base address
 #ifdef	XPAR_TIGER4NSC_7_BASEADDR
