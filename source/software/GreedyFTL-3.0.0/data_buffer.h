@@ -44,6 +44,7 @@
 //
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Add R-Buf entry flag, read LRU list and counters
+//   - RBUF_ENTRY_COUNT can be overridden in ftl_config.h
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -56,7 +57,9 @@
 #define AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT		(USER_DIES)
 
 //R-Buf (see ftl_config.h RBUF_ENABLE): read buffer = 1 entry per die, taken out of the same entry array
+#ifndef RBUF_ENTRY_COUNT
 #define RBUF_ENTRY_COUNT								(1 * USER_DIES)
+#endif
 
 #define DATA_BUF_NONE	0xffff
 #define DATA_BUF_FAIL	0xffff

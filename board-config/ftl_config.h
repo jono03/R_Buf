@@ -60,6 +60,12 @@
 #define RBUF_ENABLE	0
 #endif
 
+//R-Buf read buffer size in entries (16KB each), taken out of the 16 x USER_DIES entries.
+//original paper ratio is 1 x USER_DIES; larger values give reads more parallelism
+#ifndef RBUF_ENTRY_COUNT
+#define RBUF_ENTRY_COUNT	(1 * USER_DIES)
+#endif
+
 //checks NSC connection, initializes base address
 #ifdef	XPAR_T4NFC_HLPER_7_BASEADDR
 #define NSC_7_CONNECTED	1
