@@ -1,5 +1,6 @@
 #!/bin/bash
 # E1 (team procedure 9.4 / 11): read-only vs mixed, our conditions:
+#   outstanding reads <= 8: read-only 4 jobs x QD2, mixed read 2 jobs x QD4 + write 2 jobs x QD32
 #   read 4KB in [0, READ_SIZE), write 16KB in [READ_SIZE, READ_SIZE+WRITE_SIZE),
 #   only the read area is prefilled, GC avoided by keeping total writes small.
 # usage: ./e1.sh <tag>      e.g. ./e1.sh rbuf1   -> <tag>_*.txt
@@ -13,7 +14,7 @@ READ_SIZE=${READ_SIZE:-8G}
 WRITE_SIZE=${WRITE_SIZE:-8G}
 RT=${RT:-60}
 
-job() { # name numjobs rw bs offset size
+job() { # name numjobs rw bs offset size iodepth
 cat <<EOF
 
 [$1]
@@ -22,6 +23,7 @@ bs=$4
 numjobs=$2
 offset=$5
 size=$6
+iodepth=$7
 EOF
 }
 global() {
@@ -32,15 +34,14 @@ direct=1
 filename=$DEV
 time_based
 runtime=$RT
-iodepth=32
 group_reporting=1
 percentile_list=95:99
 EOF
 }
 
-{ global; job reader 4 randread 4k 0 $READ_SIZE; } > e1_ro4.fio
-{ global; job reader 2 randread 4k 0 $READ_SIZE; } > e1_ro2.fio
-{ global; job reader 2 randread 4k 0 $READ_SIZE; job writer 2 randwrite 16k $READ_SIZE $WRITE_SIZE; } > e1_mix.fio
+{ global; job reader 4 randread 4k 0 $READ_SIZE 2; } > e1_ro4.fio
+{ global; job reader 2 randread 4k 0 $READ_SIZE 4; } > e1_ro2.fio
+{ global; job reader 2 randread 4k 0 $READ_SIZE 4; job writer 2 randwrite 16k $READ_SIZE $WRITE_SIZE 32; } > e1_mix.fio
 
 echo "== prefill read area ($READ_SIZE) =="; date
 sudo fio --name=prefill --filename=$DEV --direct=1 --ioengine=libaio \
@@ -53,4 +54,7 @@ sudo fio e1_ro2.fio --output=${TAG}_ro2.txt || exit 1
 echo "== mixed: read 2 + write 2 =="; date
 sudo fio e1_mix.fio --output=${TAG}_mix.txt || exit 1
 date; echo done
+echo "== host timeout check (must be empty) =="
+cat /sys/module/nvme_core/parameters/io_timeout
+sudo dmesg | grep -iE "timeout|abort|reset" | tail -n 20
 grep -H -E "IOPS=|clat \(usec\)|95th" ${TAG}_ro4.txt ${TAG}_ro2.txt ${TAG}_mix.txt
