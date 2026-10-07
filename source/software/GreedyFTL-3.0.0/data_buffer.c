@@ -44,6 +44,7 @@
 //
 // * v1.1.0 (2026-10-07, R_Buf project)
 //   - Add optional R-Buf: split the LRU list into read/write lists (RBUF_ENABLE)
+//   - Print R-Buf status at boot and every 65536 read allocations
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -105,6 +106,12 @@ void InitDataBuf()
 
 	for(bufEntry = 0; bufEntry < AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT; bufEntry++)
 		tempDataBufMapPtr->tempDataBuf[bufEntry].blockingReqTail =  REQ_SLOT_TAG_NONE;
+
+#if (RBUF_ENABLE == 1)
+	xil_printf("[ R-Buf ON: read entries %d of %d ]\r\n", RBUF_ENTRY_COUNT, AVAILABLE_DATA_BUFFER_ENTRY_COUNT);
+#else
+	xil_printf("[ R-Buf OFF ]\r\n");
+#endif
 }
 
 //LRU list that the entry belongs to (always the write/unified list when R-Buf is disabled)
@@ -216,6 +223,8 @@ unsigned int AllocateDataBuf(unsigned int reqCode)
 	{
 		list = &rbufLruList;
 		rbufReadAllocCnt++;
+		if((rbufReadAllocCnt & 0xFFFF) == 0)
+			xil_printf("[ R-Buf read alloc=%u write-hit-invalidate=%u ]\r\n", rbufReadAllocCnt, rbufWriteHitInvalidateCnt);
 	}
 #endif
 
