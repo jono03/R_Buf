@@ -30,7 +30,7 @@ SDK Terminal 출력을 파일로 저장한 뒤:
 python3 tools/trace_uart2bin.py uart_log.txt trace.bin
 ```
 
-QD8처럼 레코드가 많으면 `-DTRACE_UART_MIN_MS=10`으로 빌드해 10 ms 이상 레코드만 출력한다.
+M1은 `-DTRACE_UART_LAST=20000`(마지막 2만 건 전부, 지연 기준 없음)을 권장한다. QD8처럼 레코드가 많으면(JTAG가 우선) `-DTRACE_UART_MIN_MS=10`으로 빌드해 10 ms 이상 레코드만 출력한다.
 
 ## 2. 해석
 

@@ -103,7 +103,7 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 
 - 주소 `0x00300000`(`TRACE_BASE_ADDR`). 앞 4KB = `TRACE_HDR`, 그 뒤 `TRACE_REC`(64B 고정) 최대 500,000개(약 32MB). 가득 차면 덮어쓰지 않고 `stopFlag=1`, `dropped` 증가.
 - 헤더: `magic`(`0x45435254`), `version`(3), `recCount`, `stopFlag`, `rbuf`, `trace`, `verify`, `rbufEntries`, `countsPerSecond`, `timeShift`, `maxRecords`, `recBytes`(64), `recOffset`(0x1000), 카운터(`gcCnt`, `bufEvictCnt`, `bufReadEvictCnt`, `rbufReadAllocCnt`, `rbufWriteHitInvalidateCnt`), `dropped`. 카운터는 레코드를 쓸 때마다 복사된다.
-- 필드 순서·크기는 `trace_log.h`의 `TRACE_REC`가 기준이다(`sizeof == 64`를 컴파일 시 검사). version 3에서 `pad[8]` 앞 4바이트를 `schedTrig`, `schedXfer`(각 uint16)로 썼고 나머지 `pad[4]`는 예약이다. 오프셋은 바뀌지 않았다.
+- 필드 순서·크기는 `trace_log.h`의 `TRACE_REC`가 기준이다(`sizeof == 64`를 컴파일 시 검사). version 3에서 `pad[8]`을 `schedTrig`, `schedXfer`, `schedXferWait`, `schedDieQ`(각 uint16, 스케줄러 호출 수: 트리거·전송·읽기 전송 대기·die 큐 대기)로 썼다. 예약 공간은 남지 않았고 오프셋은 바뀌지 않았다. 12월 확장 필드가 필요하면 version 4로 올린다.
 - `flags`: b0 버퍼 hit(NAND 없음), b1 R-Buf 칸 사용, b2 예약, b3 차이값 포화, b4 미매핑.
 
 ### 4-3. 명세와 다르게 한 점 (**팀 확인 필요**)
@@ -113,7 +113,7 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 | 차이값 단위 | `XTime` count 그대로 | `(차이) >> 6` (`TRACE_TIME_SHIFT`), 헤더에 `timeShift` 기록 | int32에 count를 그대로 넣으면 약 6.4초에서 넘침. 우리가 볼 정지는 21~30초. `>> 6`이면 약 413초까지 표현 |
 | `TRACE_ENABLE` 기본값 | 구현 후 1 | 1 | 명세대로 |
 | 시각이 기록되지 않은 필드 | 명시 없음 | 0으로 저장 (hit/unmapped는 `flags`로 구분) | 해석 스크립트가 flags로 판별 |
-| `pad` 사용 | 12월 확장용 예약 | 앞 4바이트에 `schedTrig`/`schedXfer` (v3) | 루프 굶주림을 직접 보이는 증거(5-2 검토 반영) |
+| `pad` 사용 | 12월 확장용 예약 | 8바이트 전부 `schedTrig`/`schedXfer`/`schedXferWait`/`schedDieQ` (v3) | 루프 굶주림을 직접 보이는 증거(5-2 검토 반영) |
 
 덤프 해석에서 시간 단위는 `2^timeShift ÷ countsPerSecond`초다.
 
@@ -164,7 +164,7 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 | `tools/trace_dump.md` | 덤프 명령 (미검증) |
 | `tools/e1.sh`, `tools/e1_table.py` | E1 (이미 완료, 추가 실행 없음) |
 | `docs/progress-report-2026-10-07.md`, `docs/review-request-2026-10-07.md` | 이전 보고서·검토 요청 |
-| 팀 문서 5종 | `README.md`, `firmware-spec.md`, `firmware-decisions.md`, `team-experiment-procedure.md`, `team-paper-idea.md` (저장소에는 없음, 공유 드라이브) |
+| 팀 문서 5종 | `README.md`, `firmware-spec.md`, `firmware-decisions.md`, `team-experiment-procedure.md`, `team-paper-idea.md` (저장소에는 없음, 프로젝트 파일. 받은 문서가 최신인지 확인: 절차 문서 v8.2, README 10-08판) |
 
 ## 9. 알려진 한계와 주의
 
@@ -215,5 +215,5 @@ README 규칙대로 저장소는 비공개로 유지한다. 실습실 원본과 
 
 - 해결안(팀 결정 필요): ① M2의 `ro` 구간만 짧게(예: `runtime=10`, 약 16만 건) 하거나, ② `TRACE_MAX_RECORDS`를 늘린다(`TRACE_BASE_ADDR` 뒤 4KB + N×64B, 100만 건 = 64MB, RESERVED0 안이지만 JTAG 덤프 시간이 늘어난다).
 - 가득 찼는지는 덤프 헤더의 `stopFlag`, `dropped`로 확인한다. `stopFlag=1`이면 그 회차는 불완전하다.
-- **UART 덤프를 쓸 때:** `ro` 구간 때문에 M1도 27만 건이라 전부 출력하면 1시간 가까이 걸린다. `-DTRACE_UART_MIN_MS=1`(1 ms 이상 레코드만)을 쓴다. 출력 중에는 보드가 명령을 받지 않으므로 실험이 끝난 뒤에만 한다.
+- **UART 덤프를 쓸 때:** `ro` 구간 때문에 M1도 27만 건이라 전부 출력하면 1시간 가까이 걸린다. M1은 `-DTRACE_UART_LAST=20000`(마지막 2만 건 전부)을 쓴다. `TRACE_UART_MIN_MS`는 지연 기준으로 걸러 펌웨어가 명령을 가져오기 전(N2) 정지를 놓칠 수 있어 M2 전용(JTAG 불가 시)이다. 출력 중에는 보드가 명령을 받지 않으므로 실험이 끝난 뒤에만 한다.
 - JTAG 덤프 크기: M1 약 17MB (`0x1000 + 27만 × 64`).

@@ -25,6 +25,9 @@
 #ifndef TRACE_UART_DUMP
 #define TRACE_UART_DUMP			0			//1 = dump the log over UART when the device has been idle for 5 s (fallback when JTAG dump does not work)
 #endif
+#ifndef TRACE_UART_LAST
+#define TRACE_UART_LAST			0			//with TRACE_UART_DUMP: print only the last N records (0 = all). Not filtered by latency, so waits before the firmware fetches the command (N2) are kept
+#endif
 #ifndef TRACE_UART_MIN_MS
 #define TRACE_UART_MIN_MS		0			//with TRACE_UART_DUMP: only records whose firmware-internal latency >= this many ms (0 = all)
 #endif
@@ -59,8 +62,9 @@ typedef struct _TRACE_REC {
 	int dXferIssue;					//IssueNandReq for REQ_CODE_READ_TRANSFER
 	int dTrigDone;					//trigger completion confirmed (reqCode becomes READ_TRANSFER)
 	unsigned short schedTrig;		//(v3) SchedulingNandReq() calls between trigger issue and trigger done (clamped to 65535)
-	unsigned short schedXfer;		//(v3) SchedulingNandReq() calls between transfer issue and transfer done
-	unsigned char pad[4];
+	unsigned short schedXfer;		//(v3) ... between transfer issue and transfer done
+	unsigned short schedXferWait;	//(v3) ... between trigger done and transfer issue (read transfer wait)
+	unsigned short schedDieQ;		//(v3) ... between die-queue insertion and trigger issue (die queue wait)
 } TRACE_REC;
 
 typedef char trace_rec_size_must_be_64[(sizeof(TRACE_REC) == 64) ? 1 : -1];

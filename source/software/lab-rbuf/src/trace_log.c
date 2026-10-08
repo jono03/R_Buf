@@ -37,10 +37,14 @@ typedef struct _TRACE_TMP {
 	unsigned int lba;
 	unsigned short flags;
 	unsigned short aheadCnt;
+	unsigned int schedAtEnq;
 	unsigned int schedAtIssue;
+	unsigned int schedAtTrigDone;
 	unsigned int schedAtXfer;
 	unsigned short schedTrig;
 	unsigned short schedXfer;
+	unsigned short schedXferWait;
+	unsigned short schedDieQ;
 	unsigned int valid;
 } TRACE_TMP;
 
@@ -149,10 +153,14 @@ void TraceBegin(unsigned int reqSlotTag, unsigned int reqCode, unsigned int star
 	t->lba = startLba;
 	t->flags = 0;
 	t->aheadCnt = 0;
+	t->schedAtEnq = 0;
 	t->schedAtIssue = 0;
+	t->schedAtTrigDone = 0;
 	t->schedAtXfer = 0;
 	t->schedTrig = 0;
 	t->schedXfer = 0;
+	t->schedXferWait = 0;
+	t->schedDieQ = 0;
 	t->valid = 1;
 }
 
@@ -200,6 +208,7 @@ void TraceEnqueue(unsigned int nandReqSlotTag, unsigned int aheadCnt)
 
 	XTime_GetTime(&traceTmp[a].tEnq);
 	traceTmp[a].aheadCnt = (aheadCnt > 0xffff) ? 0xffff : aheadCnt;
+	traceTmp[a].schedAtEnq = traceSchedCnt;
 }
 
 void TraceTrigIssue(unsigned int nandReqSlotTag, unsigned int chNo, unsigned int wayNo)
@@ -209,6 +218,11 @@ void TraceTrigIssue(unsigned int nandReqSlotTag, unsigned int chNo, unsigned int
 	if(a == TRACE_ORIGIN_NONE)
 		return;
 
+	{
+		unsigned int d = traceSchedCnt - traceTmp[a].schedAtEnq;
+
+		traceTmp[a].schedDieQ = (d > 0xffff) ? 0xffff : d;
+	}
 	XTime_GetTime(&traceTmp[a].tIssue);
 	traceTmp[a].tDieLast = traceDieLastDone[chNo][wayNo];
 	traceTmp[a].schedAtIssue = traceSchedCnt;
@@ -224,6 +238,7 @@ void TraceTrigDone(unsigned int nandReqSlotTag)
 
 		XTime_GetTime(&traceTmp[a].tTrigDone);
 		traceTmp[a].schedTrig = (d > 0xffff) ? 0xffff : d;
+		traceTmp[a].schedAtTrigDone = traceSchedCnt;
 	}
 }
 
@@ -233,7 +248,10 @@ void TraceXferIssue(unsigned int nandReqSlotTag)
 
 	if(a != TRACE_ORIGIN_NONE)
 	{
+		unsigned int d = traceSchedCnt - traceTmp[a].schedAtTrigDone;
+
 		XTime_GetTime(&traceTmp[a].tXferIssue);
+		traceTmp[a].schedXferWait = (d > 0xffff) ? 0xffff : d;
 		traceTmp[a].schedAtXfer = traceSchedCnt;
 	}
 }
@@ -320,6 +338,8 @@ void TraceDmaEnd(unsigned int reqSlotTag)
 	rec.aheadCnt = t->aheadCnt;
 	rec.schedTrig = t->schedTrig;
 	rec.schedXfer = t->schedXfer;
+	rec.schedXferWait = t->schedXferWait;
+	rec.schedDieQ = t->schedDieQ;
 	rec.dBufAlloc = TraceDiff(t->tBuf, t->tFetch, &rec.flags);
 	rec.dEnqueue = TraceDiff(t->tEnq, t->tFetch, &rec.flags);
 	rec.dDieLastDone = TraceDiff(t->tDieLast, t->tFetch, &rec.flags);
@@ -352,7 +372,7 @@ void TraceIdleDump(unsigned int idle)
 	volatile TRACE_HDR* hdr = TRACE_HDR_PTR;
 	volatile unsigned int* w;
 	XTime now;
-	unsigned int i, j, n, printed;
+	unsigned int i, j, n, printed, first;
 
 	if(dumped)
 		return;
@@ -379,7 +399,12 @@ void TraceIdleDump(unsigned int idle)
 	xil_printf("\r\n");
 
 	printed = 0;
-	for(i = 0; i < n; i++)
+	first = 0;
+#if (TRACE_UART_LAST > 0)
+	if(n > TRACE_UART_LAST)
+		first = n - TRACE_UART_LAST;
+#endif
+	for(i = first; i < n; i++)
 	{
 		w = TRACE_REC_PTR + i * (sizeof(TRACE_REC) / 4);
 #if (TRACE_UART_MIN_MS > 0)

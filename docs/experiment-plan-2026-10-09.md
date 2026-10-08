@@ -11,7 +11,7 @@
 |---|---|---|---|
 | G1 | SDK 빌드 | `trace-handoff` zip의 `firmware-src` 11개를 덮어쓰고 Clean → Build, Problems 에러 0개 | 에러 문구를 기록해 수정 |
 | G2 | 부팅·동작 | UART에 `[ RBUF=.. TRACE=1 .. ]`와 `[ TRACE base=0x00300000 max=.. shift=6 .. ]`가 나오고 `nvme list`에 Cosmos+가 보이며 짧은 fio가 돈다 | `docs/handoff-trace-log-2026-10-08.md` 6절 |
-| G3 | 덤프 | 짧은 fio 후 `trace.bin`을 꺼내 `trace_parse.py`가 해석(`magic=0x45435254`) | JTAG이 안 되면 UART 덤프 빌드(`-DTRACE_UART_DUMP=1 -DTRACE_UART_MIN_MS=1`) |
+| G3 | 덤프 | 짧은 fio 후 `trace.bin`을 꺼내 `trace_parse.py`가 해석(`magic=0x45435254`) | JTAG이 안 되면 UART 덤프 빌드(M1: `-DTRACE_UART_DUMP=1 -DTRACE_UART_LAST=20000`) |
 | G4 | 레코드 값 | 시각이 `dBufAlloc ≤ dEnqueue ≤ dIssue ≤ dTrigDone ≤ dXferIssue ≤ dNandDone ≤ dDmaStart ≤ dDmaEnd`, 읽기만 펌웨어 내부 지연 < 227 µs, `saturated` 거의 없음 | 기록 지점 수정 |
 | G5 | 팀 결정 | M2의 `ro` 구간 길이(아래 2절), 폴링 보정 보기의 지위(아래 8절) | 결정 전에는 M2를 돌리지 않는다 |
 | G6 | 실습실·보드 | 10/9(휴일) 출입 가능, JTAG·UART 연결 확인 | 일정이 하루씩 밀림 |
@@ -100,7 +100,7 @@ EOF
 - 부팅당 쓰기 24GB(채우기 8 + 폭주 16)라 GC 한도(약 49GB) 안이다. **한 부팅에 한 회차만.**
 - 읽기 동시성은 R-Buf 읽기 칸 수 8 이하다(M1 1, M2 8).
 
-## 3. 회차별 절차 (S1 R1 S2 R2 S3 R3, 이어서 M2 S R)
+## 3. 회차별 절차 (실행 순서는 5절: S1 R1 S2 R2, M2 S R, 점심 후 S3 R3)
 
 ### 3-1. 부팅
 
@@ -204,7 +204,7 @@ cat ${TAG}_ro_clat.2.log ${TAG}_reader_clat.3.log | wc -l      # fio 읽기 수
 
 ## 4. 실행 순서와 우선순위
 
-**순서(계획서 고정):** M1은 S1 → R1 → S2 → R2 → S3 → R3, 이어서 M2 S → R. 빌드가 번갈아 바뀌므로 순서 효과(보드 온도 등)가 한쪽으로 쏠리지 않는다.
+**순서:** S1 → R1 → S2 → R2 → M2 S → M2 R → S3 → R3 (M2를 S3·R3보다 먼저, 5절 일정과 같다). 빌드가 번갈아 바뀌므로 순서 효과(보드 온도 등)가 한쪽으로 쏠리지 않는다.
 
 시간이 부족하면 아래 순서로 자른다(위쪽이 더 중요).
 
@@ -240,7 +240,7 @@ cat ${TAG}_ro_clat.2.log ${TAG}_reader_clat.3.log | wc -l      # fio 읽기 수
 
 | 상황 | 대응 |
 |---|---|
-| 첫 회차 덤프가 안 됨 | UART 덤프 빌드로 전환. M1은 `TRACE_UART_MIN_MS=1`(1 ms 이상만. 줄 수는 측정 전이라 모르지만 폭주 구간 읽기가 약 1만 건이므로 1만 줄 이하, 약 2~3분) |
+| 첫 회차 덤프가 안 됨 | UART 덤프 빌드로 전환. M1은 `TRACE_UART_LAST=20000`(마지막 2만 건 전부. 지연 기준으로 거르지 않아 펌웨어가 명령을 가져오기 전(N2) 정지도 남는다. 약 2~4분). M2는 JTAG가 사실상 필수이며, UART만 되면 `TRACE_UART_MIN_MS=10`을 쓰되 "fetch 전 정지는 M2에서 판정하지 않음"을 한계에 적는다 |
 | UART 덤프도 안 됨 | 계측 없는 빌드(`TRACE_ENABLE=0`)로 M1을 6회 새로 측정(절차 문서 11절 사용 규칙). 주장은 "R-Buf로도 정지가 남는다"까지 |
 | `stopFlag=1` | `TRACE_MAX_RECORDS`를 늘리거나 `ROT`를 줄여 그 회차 재실행 |
 | `[GC]`가 찍힘 | 그 회차 폐기, 재부팅 후 재실행 |
@@ -279,8 +279,8 @@ cat ${TAG}_ro_clat.2.log ${TAG}_reader_clat.3.log | wc -l      # fio 읽기 수
 | # | 질문 | 제안 |
 |---|---|---|
 | 1 | M2 `ro` 구간 길이 (로그 용량) | `ROT=10`. 코드 변경 없음, JTAG 덤프도 빠름 |
-| 2 | 폴링 보정 보기를 주 결과로 쓸지 | 팀 규칙 보기를 주로, 보정 보기는 보조(데이터를 보기 전에 확정) |
-| 3 | 레코드 형식 version 3(`pad` 4바이트에 스케줄러 호출 수) | 승인 요청 |
+| 2 | 호출 수 기반 규칙을 측정 전에 고정할지 | 팀 규칙 보기가 주. 보조로 호출 수 규칙(구간 평균 폴링 간격 = 길이÷(호출 수+1) > 1 ms이면 물리 시간 초과분을 루프로). `trace_parse.py --poll-ms 1 --phys-ms <읽기만 p99>`. 0.3 ms 보정 보기는 참고만 (검토 의견 1009 반영) |
+| 3 | 레코드 형식 version 3(`pad` 8바이트에 스케줄러 호출 수 4구간: die 큐 대기·트리거·전송 대기·전송) | 승인(검토 의견 1009) |
 | 4 | 덤프 방법(JTAG/UART) 실패 시 계측 없는 빌드로 가는 기준 | 첫 회차 결과로 판단 |
 | 5 | 저장소에 실습실 마이크로코드 포함(비공개 유지 확인) | README는 비공개 유지로 되어 있음 |
 

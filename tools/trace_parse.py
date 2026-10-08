@@ -36,9 +36,9 @@ HDR_FMT = "<19I"
 HDR_NAMES = ["magic", "version", "recCount", "stopFlag", "rbuf", "trace", "verify", "rbufEntries",
              "countsPerSecond", "timeShift", "maxRecords", "recBytes", "recOffset", "gcCnt",
              "bufEvictCnt", "bufReadEvictCnt", "rbufReadAllocCnt", "rbufWriteHitInvalidateCnt", "dropped"]
-REC_FMT = "<IIQ7iHHiiHH4s"
+REC_FMT = "<IIQ7iHHiiHHHH"
 REC_NAMES = ["seq", "lba", "tFetch", "dBufAlloc", "dEnqueue", "dDieLastDone", "dIssue", "dNandDone",
-             "dDmaStart", "dDmaEnd", "flags", "aheadCnt", "dXferIssue", "dTrigDone", "schedTrig", "schedXfer", "pad"]
+             "dDmaStart", "dDmaEnd", "flags", "aheadCnt", "dXferIssue", "dTrigDone", "schedTrig", "schedXfer", "schedXferWait", "schedDieQ"]
 MAGIC = 0x45435254
 
 assert struct.calcsize(REC_FMT) == 64
@@ -64,7 +64,7 @@ def load(path):
         v = struct.unpack_from(REC_FMT, data, h["recOffset"] + i * 64)
         d = dict(zip(REC_NAMES, v))
         if h["version"] < 3:
-            d["schedTrig"] = d["schedXfer"] = 0
+            d["schedTrig"] = d["schedXfer"] = d["schedXferWait"] = d["schedDieQ"] = 0
         recs.append(d)
     return h, recs
 
@@ -93,6 +93,29 @@ def segments(r, nand_ticks):
     seg["dieq"] = max(0, r["dDieLastDone"] - r["dEnqueue"])
     seg["xferwait"] = max(0, r["dXferIssue"] - r["dTrigDone"])
     seg["nanddma"] = min(trig, nand_ticks) + min(xfer, nand_ticks) + min(dma, nand_ticks)
+    return seg
+
+
+def segments_calls(r, phys, poll_ticks):
+    """call-count rule (secondary, fixed before looking at data): average polling interval of an interval =
+    length / (scheduler calls + 1). Above poll_ticks the loop was not checking NAND state, so the part above the
+    physical time (trigger/transfer: phys ticks; die queue / transfer wait: 0) is loop; otherwise it stays NAND+DMA
+    (trigger/transfer/DMA) or die queue / transfer wait."""
+    seg = segments(r, None)
+    if r["flags"] & (0x0001 | 0x0010):
+        return seg
+    def sparse(length, calls):
+        return length / (calls + 1.0) > poll_ticks
+    trig = max(0, r["dTrigDone"] - r["dIssue"])
+    xfer = max(0, r["dNandDone"] - r["dXferIssue"])
+    if sparse(trig, r["schedTrig"]):
+        ex = max(0, trig - phys); seg["loop"] += ex; seg["nanddma"] -= ex
+    if sparse(xfer, r["schedXfer"]):
+        ex = max(0, xfer - phys); seg["loop"] += ex; seg["nanddma"] -= ex
+    if sparse(seg["xferwait"], r["schedXferWait"]):
+        seg["loop"] += seg["xferwait"]; seg["xferwait"] = 0
+    if sparse(seg["dieq"], r["schedDieQ"]):
+        seg["loop"] += seg["dieq"]; seg["dieq"] = 0
     return seg
 
 
@@ -148,6 +171,8 @@ def main():
     stall_ms = float(args[args.index("--stall-ms") + 1]) if "--stall-ms" in args else 1000.0
     nand_ms = float(args[args.index("--nand-ms") + 1]) if "--nand-ms" in args else 0.3
     die_ms = float(args[args.index("--die-ms") + 1]) if "--die-ms" in args else 0.57
+    poll_ms = float(args[args.index("--poll-ms") + 1]) if "--poll-ms" in args else 1.0
+    phys_arg = float(args[args.index("--phys-ms") + 1]) if "--phys-ms" in args else None
     fio_paths = [args[i + 1] for i, a in enumerate(args) if a == "--fio-log"]
 
     h, recs = load(path)
@@ -162,7 +187,18 @@ def main():
     nand_ticks = int(nand_ms / unit_ms)
     rows = []
     adj = {}
+    cc = {}
+    poll_ticks = poll_ms / unit_ms
+    if phys_arg is not None:
+        phys = phys_arg / unit_ms
+    else:   # no read-only reference given: median trigger/transfer interval of this dump (use --phys-ms with the read-only run's p99)
+        iv = sorted(max(0, r["dTrigDone"] - r["dIssue"]) + max(0, r["dNandDone"] - r["dXferIssue"])
+                    for r in recs if not (r["flags"] & 0x11))
+        phys = iv[len(iv) // 2] / 2.0 if iv else 0
+        print("call-count rule: poll threshold %.2f ms, physical time per interval %.3f ms (median of this dump; "
+              "pass --phys-ms <read-only p99> to fix it)" % (poll_ms, phys * unit_ms))
     for r in recs:
+        cc[r["seq"]] = segments_calls(r, phys, poll_ticks)
         s = segments(r, None)                  # primary: team rule
         adj[r["seq"]] = segments(r, nand_ticks)   # secondary: polling-adjusted
         total = r["dDmaEnd"]
@@ -176,15 +212,16 @@ def main():
 
     if csv_path:
         with open(csv_path, "w") as f:
-            f.write("seq,lba,flags,aheadCnt,schedTrig,schedXfer,total_ms,host_ms,fetchbefore_ms,buffer_ms,dieq_ms,loop_ms,xferwait_ms,nanddma_ms,loop_adj_ms,nanddma_adj_ms\n")
+            f.write("seq,lba,flags,aheadCnt,schedDieQ,schedTrig,schedXferWait,schedXfer,total_ms,host_ms,fetchbefore_ms,buffer_ms,dieq_ms,loop_ms,xferwait_ms,nanddma_ms,loop_adj_ms,nanddma_adj_ms,loop_cc_ms,nanddma_cc_ms\n")
             for r, s, total in rows:
                 hm = host.get(r["seq"])
                 a = adj[r["seq"]]
-                f.write("%d,%d,0x%04x,%d,%d,%d,%.4f,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
-                    r["seq"], r["lba"], r["flags"], r["aheadCnt"], r["schedTrig"], r["schedXfer"], total * unit_ms,
+                f.write("%d,%d,0x%04x,%d,%d,%d,%d,%d,%.4f,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
+                    r["seq"], r["lba"], r["flags"], r["aheadCnt"], r["schedDieQ"], r["schedTrig"], r["schedXferWait"], r["schedXfer"], total * unit_ms,
                     "%.4f" % hm if hm is not None else "", "%.4f" % (hm - total * unit_ms) if hm is not None else "",
                     s["buffer"] * unit_ms, s["dieq"] * unit_ms, s["loop"] * unit_ms,
-                    s["xferwait"] * unit_ms, s["nanddma"] * unit_ms, a["loop"] * unit_ms, a["nanddma"] * unit_ms))
+                    s["xferwait"] * unit_ms, s["nanddma"] * unit_ms, a["loop"] * unit_ms, a["nanddma"] * unit_ms,
+                    cc[r["seq"]]["loop"] * unit_ms, cc[r["seq"]]["nanddma"] * unit_ms))
         print("csv written: %s" % csv_path)
 
     totals = sorted(t * unit_ms for _, _, t in rows)
@@ -227,6 +264,7 @@ def main():
     def view(sel, title):
         summarize(sel, title + " [team rule]")
         summarize([(r, adj[r["seq"]], t) for r, _, t in sel], title + " [polling-adjusted, secondary]")
+        summarize([(r, cc[r["seq"]], t) for r, _, t in sel], title + " [call-count rule, secondary]")
 
     view(rows, "all reads")
     p99 = pct(totals, 99)
@@ -250,11 +288,11 @@ def main():
         sus = ""
         if not (r["flags"] & 0x11) and s["dieq"] * unit_ms > 3 * (r["aheadCnt"] + 1) * die_ms:
             sus = " dieq-suspect(polling?)"
-        print("  seq %d  host=%s  fw=%.1f ms  fetch-before=%s  -> %s (polling-adjusted: %s)  [%s]  ahead=%d  calls trig=%d xfer=%d  flags=0x%04x%s" % (
+        print("  seq %d  host=%s  fw=%.1f ms  fetch-before=%s  -> %s (polling-adjusted: %s)  [%s]  ahead=%d  calls dieq=%d trig=%d xferwait=%d xfer=%d  flags=0x%04x%s" % (
             r["seq"], ("%.1f ms" % hm) if hm is not None else "n/a", fw,
             ("%.1f ms" % fb) if fb is not None else "n/a", dom, dom_adj,
             " ".join("%s=%.1f" % (k, s[k] * unit_ms) for k in keys),
-            r["aheadCnt"], r["schedTrig"], r["schedXfer"], r["flags"], sus))
+            r["aheadCnt"], r["schedDieQ"], r["schedTrig"], r["schedXferWait"], r["schedXfer"], r["flags"], sus))
 
 
 if __name__ == "__main__":

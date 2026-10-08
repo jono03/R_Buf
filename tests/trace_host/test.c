@@ -34,9 +34,11 @@ int main(void)
 	TRACE_LINK(9, 5);
 	fakeNow = 1500; TRACE_ENQUEUE(9, 2);
 	fakeNow = 1600; TRACE_DIE_DONE(0, 1);
+	TRACE_SCHED_TICK(); TRACE_SCHED_TICK();
 	fakeNow = 2000; TRACE_TRIG_ISSUE(9, 0, 1);
 	TRACE_SCHED_TICK(); TRACE_SCHED_TICK(); TRACE_SCHED_TICK();
 	fakeNow = 3000; TRACE_TRIG_DONE(9);
+	for(int k = 0; k < 4; k++) TRACE_SCHED_TICK();
 	fakeNow = 3500; TRACE_XFER_ISSUE(9);
 	for(int k = 0; k < 5; k++) TRACE_SCHED_TICK();
 	fakeNow = 4000; TRACE_NAND_DONE(9);
@@ -50,6 +52,7 @@ int main(void)
 	CHECK(r->dNandDone == 3000 && r->dDmaStart == 3200 && r->dDmaEnd == 4000);
 	CHECK(r->flags == TRACE_F_RBUF_ENTRY && r->aheadCnt == 2);
 	CHECK(r->schedTrig == 3 && r->schedXfer == 5);
+	CHECK(r->schedDieQ == 2 && r->schedXferWait == 4);
 
 	/* write request must be ignored */
 	TRACE_BEGIN(6, 0x00, 77);
