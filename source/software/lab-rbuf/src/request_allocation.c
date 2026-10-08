@@ -157,6 +157,7 @@ unsigned int GetFromFreeReqQ()
 	reqPoolPtr->reqPool[reqSlotTag].reqQueueType =  REQ_QUEUE_TYPE_NONE;
 	freeReqQ.reqCnt--;
 
+	TRACE_SLOT_ALLOC(reqSlotTag);
 	return reqSlotTag;
 }
 

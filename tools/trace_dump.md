@@ -21,11 +21,25 @@ mrd -bin -file trace.bin 0x00300000 <워드 수>
 - 읽기 중 CPU가 도는 상태에서 DRAM을 읽는 것이 되는지는 보드에서 확인 필요. 안 되면 `stop`으로 CPU를 멈춘 뒤 읽는다(그 뒤 이 실행은 끝난 것으로 본다).
 - xsct 구문이 이 SDK 버전과 다르면 `help mrd`로 확인. 안 되면 spec 5절 대안(UART 출력)으로.
 
+## 1-2. UART 덤프 (JTAG이 안 될 때, `TRACE_UART_DUMP=1` 빌드)
+
+실험이 끝나고 5초 동안 I/O가 없으면 보드가 로그를 UART로 한 번 출력한다(약 1만 건에 2분).
+SDK Terminal 출력을 파일로 저장한 뒤:
+
+```
+python3 tools/trace_uart2bin.py uart_log.txt trace.bin
+```
+
+QD8처럼 레코드가 많으면 `-DTRACE_UART_MIN_MS=10`으로 빌드해 10 ms 이상 레코드만 출력한다.
+
 ## 2. 해석
 
 ```
-python3 tools/trace_parse.py trace.bin --csv trace.csv
+python3 tools/trace_parse.py trace.bin --csv trace.csv \
+    --fio-log <TAG>_ro_clat.1.log --fio-log <TAG>_reader_clat.2.log
 ```
+
+`--fio-log`(fio `write_lat_log`, `log_offset=1`)를 주면 호스트 지연으로 정지를 고르고 fetch 전 대기를 계산한다(fio 로그 파일 이름의 번호는 실행마다 다를 수 있으니 `ls`로 확인). 호스트 지연 없이도 실행되지만 fetch 전(N2) 정지는 보이지 않는다.
 
 - 헤더 값(카운터: GC, 읽기 eviction, 읽기 칸 할당, 무효화), 레코드 수, 중단 플래그 출력.
 - 읽기별 구간(buffer / dieq / loop / xferwait / nanddma)과 p99 이상·1초 이상 정지 읽기의 구간 비중, 정지 목록.

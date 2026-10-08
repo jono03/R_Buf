@@ -11,13 +11,13 @@
 | 코드 위치 | 저장소 `source/software/lab-rbuf/src/` (브랜치 `claude/new-session-hkspsr`, 커밋 `b33c5de`) |
 | 기준 소스 | `source/software/lab-gftl3/src/` = 실습실 원본(수정 금지, diff 기준) |
 | 새 파일 | `trace_log.h`, `trace_log.c` |
-| 수정한 파일 | `ftl_config.h`, `data_buffer.c`, `garbage_collection.c/.h`, `request_transform.c`, `request_allocation.c`, `request_schedule.c`, `nvme/nvme_io_cmd.c` |
+| 수정한 파일 | `ftl_config.h`, `data_buffer.c`, `garbage_collection.c/.h`, `request_transform.c`, `request_allocation.c`, `request_schedule.c`, `nvme/nvme_io_cmd.c`, `nvme/nvme_main.c` |
 | PC 로직 테스트 | ✅ 통과 (`tests/trace_host/run.sh`) |
 | 해석 스크립트 | ✅ 가짜 덤프로 검증 (`tools/trace_parse.py`) |
 | SDK 빌드 | ❌ 아직 안 함 (**첫 할 일**) |
 | 보드 부팅·동작 | ❌ 아직 안 함 |
 | JTAG 덤프 | ❌ 시험 전 (`tools/trace_dump.md`의 명령은 미검증) |
-| UART 출력 대안 | ❌ 코드 없음 (덤프가 안 될 때만 필요, 5절) |
+| UART 출력 대안 | 🟡 코드 작성(`TRACE_UART_DUMP`, 기본 0). PC 시험만 했고 보드 시험 전 (5절) |
 
 ## 2. 이 작업이 필요한 이유
 
@@ -28,8 +28,8 @@
 
 ### 3-1. SDK에 파일 넣고 빌드
 
-1. 저장소의 `source/software/lab-rbuf/src/`에서 아래 10개를 SDK `run-rbuf/src/`에 덮어쓴다.
-   `trace_log.h`, `trace_log.c`(새 파일), `ftl_config.h`, `data_buffer.c`, `garbage_collection.c`, `garbage_collection.h`, `request_transform.c`, `request_allocation.c`, `request_schedule.c`, `nvme/nvme_io_cmd.c`
+1. 저장소의 `source/software/lab-rbuf/src/`에서 아래 11개를 SDK `run-rbuf/src/`에 덮어쓴다. (`nvme/nvme_main.c`는 줄바꿈이 CRLF이므로 파일째 복사할 것)
+   `trace_log.h`, `trace_log.c`(새 파일), `ftl_config.h`, `data_buffer.c`, `garbage_collection.c`, `garbage_collection.h`, `request_transform.c`, `request_allocation.c`, `request_schedule.c`, `nvme/nvme_io_cmd.c`, `nvme/nvme_main.c`
 2. `trace_log.c`가 새 파일이므로 SDK에서 `src` 우클릭 → **Refresh**(또는 Import)로 프로젝트에 인식시킨다.
 3. `ftl_config.h`의 `RBUF_ENABLE`을 설정한다(S-Buf = 0, R-Buf = 1). 저장소 기본값은 0이다.
 4. `run-rbuf` 우클릭 → **Clean Project** → **Build Project**. Problems 탭 에러가 0개여야 한다.
@@ -62,7 +62,7 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 ```
 
 - 헤더 `magic`이 `0x45435254`이면 덤프가 맞다.
-- **통과 기준:** 레코드 수가 fio 읽기 수와 거의 같고, 읽기만 돌린 총 지연이 약 0.2~0.3 ms(기존 `rbuf2` 읽기만 평균 227 µs와 비슷)이며, 시각 필드가 아래 순서를 따른다.
+- **통과 기준:** 레코드 수가 fio 읽기 수와 거의 같고, 읽기만 돌린 **펌웨어 내부 지연(`dDmaEnd`)이 227 µs보다 작으며**(227 µs는 호스트가 잰 값이라 fetch 전 대기·호스트 경로가 포함됨, 펌웨어 값은 그보다 작아야 정상), 시각 필드가 아래 순서를 따른다.
   `dBufAlloc ≤ dEnqueue ≤ dIssue ≤ dTrigDone ≤ dXferIssue ≤ dNandDone ≤ dDmaStart ≤ dDmaEnd`
 - 순서가 어긋난 레코드가 많으면 기록 지점이 잘못 연결된 것이다(6절 표 참고).
 - **JTAG 덤프가 안 되면 5절.**
@@ -92,6 +92,9 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 | `dNandDone`, die 완료 시각 | `ExecuteNandReq()`의 완료 분기, `GetFromNandReqQ()` 앞(`dNandDone`)과 뒤(die 완료 갱신) | `TRACE_NAND_DONE`, `TRACE_DIE_DONE` |
 | `dDmaStart` | `request_transform.c: IssueNvmeDmaReq()`의 TxDMA 분기 | `TRACE_DMA_START` |
 | `dDmaEnd` + 레코드 기록 | `request_transform.c: CheckDoneNvmeDmaReq()`, TxDMA 완료 확인 시 | `TRACE_DMA_END` |
+| 슬롯 연결 초기화 | `request_allocation.c: GetFromFreeReqQ()` 끝 (요청 슬롯을 받을 때 B→A 연결 삭제) | `TRACE_SLOT_ALLOC` |
+| `schedTrig`, `schedXfer` | `request_schedule.c: SchedulingNandReq()` 맨 앞에서 호출 횟수를 센다. 트리거 발행→완료, 전송 발행→완료 사이의 호출 수 차이를 기록 | `TRACE_SCHED_TICK` |
+| UART 덤프(스위치) | `nvme/nvme_main.c` 메인 루프 맨 끝 | `TRACE_IDLE_DUMP` |
 
 - 쓰기 요청, 쓰기 RMW용 읽기(A가 쓰기)는 기록하지 않는다(`TraceBegin`이 `REQ_CODE_READ`만 받음).
 - `TRACE_ENABLE`을 0으로 하면 모든 `TRACE_*`가 빈 문장으로 컴파일된다.
@@ -99,8 +102,8 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 ### 4-2. 저장 형식 (바꾸지 않는다: 분석 스크립트가 의존)
 
 - 주소 `0x00300000`(`TRACE_BASE_ADDR`). 앞 4KB = `TRACE_HDR`, 그 뒤 `TRACE_REC`(64B 고정) 최대 500,000개(약 32MB). 가득 차면 덮어쓰지 않고 `stopFlag=1`, `dropped` 증가.
-- 헤더: `magic`(`0x45435254`), `version`(2), `recCount`, `stopFlag`, `rbuf`, `trace`, `verify`, `rbufEntries`, `countsPerSecond`, `timeShift`, `maxRecords`, `recBytes`(64), `recOffset`(0x1000), 카운터(`gcCnt`, `bufEvictCnt`, `bufReadEvictCnt`, `rbufReadAllocCnt`, `rbufWriteHitInvalidateCnt`), `dropped`. 카운터는 레코드를 쓸 때마다 복사된다.
-- 필드 순서·크기는 `trace_log.h`의 `TRACE_REC`가 기준이다(`sizeof == 64`를 컴파일 시 검사).
+- 헤더: `magic`(`0x45435254`), `version`(3), `recCount`, `stopFlag`, `rbuf`, `trace`, `verify`, `rbufEntries`, `countsPerSecond`, `timeShift`, `maxRecords`, `recBytes`(64), `recOffset`(0x1000), 카운터(`gcCnt`, `bufEvictCnt`, `bufReadEvictCnt`, `rbufReadAllocCnt`, `rbufWriteHitInvalidateCnt`), `dropped`. 카운터는 레코드를 쓸 때마다 복사된다.
+- 필드 순서·크기는 `trace_log.h`의 `TRACE_REC`가 기준이다(`sizeof == 64`를 컴파일 시 검사). version 3에서 `pad[8]` 앞 4바이트를 `schedTrig`, `schedXfer`(각 uint16)로 썼고 나머지 `pad[4]`는 예약이다. 오프셋은 바뀌지 않았다.
 - `flags`: b0 버퍼 hit(NAND 없음), b1 R-Buf 칸 사용, b2 예약, b3 차이값 포화, b4 미매핑.
 
 ### 4-3. 명세와 다르게 한 점 (**팀 확인 필요**)
@@ -110,16 +113,23 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 | 차이값 단위 | `XTime` count 그대로 | `(차이) >> 6` (`TRACE_TIME_SHIFT`), 헤더에 `timeShift` 기록 | int32에 count를 그대로 넣으면 약 6.4초에서 넘침. 우리가 볼 정지는 21~30초. `>> 6`이면 약 413초까지 표현 |
 | `TRACE_ENABLE` 기본값 | 구현 후 1 | 1 | 명세대로 |
 | 시각이 기록되지 않은 필드 | 명시 없음 | 0으로 저장 (hit/unmapped는 `flags`로 구분) | 해석 스크립트가 flags로 판별 |
+| `pad` 사용 | 12월 확장용 예약 | 앞 4바이트에 `schedTrig`/`schedXfer` (v3) | 루프 굶주림을 직접 보이는 증거(5-2 검토 반영) |
 
 덤프 해석에서 시간 단위는 `2^timeShift ÷ countsPerSecond`초다.
 
-## 5. 덤프가 안 될 때 (미구현)
+## 5. 덤프가 안 될 때: UART 덤프 (컴파일 스위치, 보드 시험 전)
 
-계획서 순서: JTAG `xsct mrd` → UART 출력 → 로그 창 LBA.
+계획서 순서: JTAG `xsct mrd` → UART 출력 → 로그 창 LBA. UART 출력은 **구현해 두었고 기본은 꺼져 있다.**
 
-- **QD1(M1):** "I/O가 5초 없으면 새 레코드를 UART로 전부 출력". 실행당 읽기 약 1만 건 × 64B ≈ 640KB. 이 코드는 **아직 없다.** `TraceDmaEnd`에서 쌓은 레코드를 `main` 루프의 유휴 시점(예: `nvme_main.c`의 루프에서 5초 동안 새 명령이 없을 때)에 `xil_printf`로 hex 출력하는 함수를 추가해야 한다. 이때 출력 중 호스트 명령 처리가 밀리지 않도록 실험이 끝난 뒤에만 실행.
-- **QD8(M2):** 레코드가 10배 이상이라 펌웨어 내부 지연(`dDmaEnd`)이 10 ms 이상인 레코드만 출력하도록 필터.
-- UART 출력은 "측정 중 UART 금지" 규칙의 예외가 되므로 실험이 끝난 뒤 출력한다고 명시할 것.
+- 켜기: `ftl_config.h` 근처에서 `#define TRACE_UART_DUMP 1` (또는 빌드 옵션 `-DTRACE_UART_DUMP=1`). 기본 0이면 코드가 컴파일되지 않는다.
+- 동작: 기록된 레코드 수가 5초 동안 늘지 않고 처리 중인 명령이 없을 때(`nvmeDmaReqQ` 비어 있음, `notCompletedNandReqCnt`·`blockedReqCnt` 0) **한 번만** 아래 줄을 UART로 출력한다.
+  - `[TRC] BEGIN n=<레코드 수>`, `[TRC] H <헤더 19워드 hex>`, `[TRC] R <번호> <레코드 16워드 hex>` (레코드마다 한 줄), `[TRC] END printed=<수>`
+- 변환·해석: SDK Terminal 로그를 파일로 저장 → `python3 tools/trace_uart2bin.py uart_log.txt trace.bin` → `python3 tools/trace_parse.py trace.bin ...`
+- 시간: 레코드 한 줄 약 160자. 1만 건이면 약 1.6MB, 115200 baud에서 **약 2분**. 출력 중에는 보드가 호스트 명령을 받지 않으므로 실험이 끝난 뒤에만 나오도록 5초 무I/O 조건을 둔 것이다.
+- **M2(QD8)처럼 레코드가 많을 때:** `-DTRACE_UART_MIN_MS=10`으로 빌드하면 펌웨어 내부 지연이 10 ms 이상인 레코드만 출력한다(`trace_uart2bin.py`가 recCount를 출력된 수로 고친다).
+- **주의:** M1은 `ro`(읽기만 60초)와 `reader`가 `startdelay=2`로 이어진다. 이 사이가 2초이므로 5초 조건에는 걸리지 않지만, fio 설정을 바꿔 5초 이상 I/O가 멈추는 구간을 만들면 측정 도중에 덤프가 시작된다.
+- UART 출력은 "측정 중 UART 금지"의 예외다. 실험이 끝난 뒤에만 나온다고 표에 명시할 것.
+- 보드에서 시험한 적 없음. PC에서는 가짜 시계로 출력 → 변환 → 해석까지 통과(`tests/trace_host/run.sh`).
 
 ## 6. 문제가 생겼을 때 의심할 곳
 
@@ -168,3 +178,19 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv
 ## 10. 저장소 비공개 유지
 
 README 규칙대로 저장소는 비공개로 유지한다. 실습실 원본과 마이크로코드 헤더(`t4nsc_ucode.h`, `t4nsc_pm.h`)가 들어 있다(공개 범위 확인 전).
+
+## 11. 2026-10-08 검토 반영 (`response-1008.md`)
+
+외부 검토 의견을 코드와 대조해 확인하고 반영했다.
+
+| 검토 의견 | 확인 | 조치 |
+|---|---|---|
+| B 슬롯의 `traceOrigin`이 NAND 완료 때만 지워져, 읽기 재시도 실패 경로(`ExecuteNandReq` FAIL 분기)에서는 남는다. 슬롯이 재사용되면 엉뚱한 읽기의 시각을 덮어쓸 수 있다 | ✅ 맞음. FAIL 분기는 `TraceNandDone`을 거치지 않고 요청이 끝난다. 또 B 쪽 hook은 A의 `valid`도 확인하지 않았다 | `GetFromFreeReqQ()`에서 슬롯을 받을 때 `traceOrigin`을 NONE으로 초기화(`TRACE_SLOT_ALLOC`), B 쪽 hook이 A의 `valid`도 확인하도록 수정. PC 테스트에 슬롯 재사용 2건 추가 |
+| 정지는 호스트 fio 지연 로그로 골라야 한다. 정지가 fetch 전(N2)에 생기면 펌웨어 내부 지연이 짧아 정지가 안 보인다 | ✅ 맞음. 이전 파서는 펌웨어 내부 1초 이상만 정지로 골랐다 | `trace_parse.py --fio-log`: fio 읽기 지연 로그를 순서 + LBA(`lba × 4096 = fio offset`)로 매칭, 호스트 기준으로 정지를 고르고 `fetch-before = 호스트 − 펌웨어`를 계산. 호스트에서는 정지인데 펌웨어는 짧으면 `fetch-before (N2)`로 표시 |
+| 트리거·전송·DMA 완료는 폴링으로 늦게 알아챈 시각일 수 있다. 실습실 `nvme_main.c`는 명령을 받은 반복에서 `exeLlr = 0`이라 NAND 스케줄링·DMA 완료 확인을 건너뛴다. 통째로 NAND+DMA로 묶으면 루프 원인(B)이 NAND로 잘못 판정된다 | ✅ 맞음. `nvme_main.c`에서 명령을 처리한 반복은 `exeLlr = 0`이고 `CheckDoneNvmeDmaReq()`·`SchedulingNandReq()`는 `exeLlr`일 때만 실행된다(쓰기 QD32이면 호스트가 큐를 계속 채울 수 있음) | 파서: `--nand-ms`(기본 0.3 ms)를 넘는 트리거·전송·호스트 DMA 구간은 `nanddma`가 아니라 `loop`로 분류. 대기가 `--die-ms`(0.57 ms) 기준 3×(앞선 수+1)을 넘으면 `dieq-suspect(polling?)` 표시. 이 기준값은 추정이므로 결과를 보고 조정할 것 |
+| (선택) `SchedulingNandReq()` 호출 횟수 차이를 기록해 루프 굶주림을 직접 증거로 | ✅ 반영 | `schedTrig`, `schedXfer`(uint16, pad 사용, version 3). 긴 대기에 호출이 거의 없으면 루프가 폴링하지 않은 것(B), 호출이 많은데 길면 NAND/die가 실제로 바쁜 것 |
+| UART 대안 코드를 컴파일 스위치로 미리 | ✅ 반영 | 5절 |
+| 통과 기준 보정: 읽기만 총 지연은 호스트 값, 펌웨어 값은 227 µs보다 작아야 | ✅ 반영 | 3-3절 |
+| 시간 단위 `>> 6` 승인, 계측 부담은 작을 것 | 참고 | 측정 후 `rbuf2`(계측 없음, 읽기만 4,364 IOPS)와 비교해 확인 |
+
+**남은 불확실성:** 이 검토와 우리 확인은 코드와 문서를 읽은 것이다. SDK 빌드·보드 동작·덤프는 아직 아무도 확인하지 못했다.

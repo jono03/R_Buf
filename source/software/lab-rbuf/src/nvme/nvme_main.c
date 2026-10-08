@@ -67,6 +67,7 @@
 #include "nvme_io_cmd.h"
 
 #include "../memory_map.h"
+#include "../trace_log.h"
 
 volatile NVME_CONTEXT g_nvmeTask;
 
@@ -189,6 +190,8 @@ void nvme_main()
 			CheckDoneNvmeDmaReq();
 			SchedulingNandReq();
 		}
+
+		TRACE_IDLE_DUMP((nvmeDmaReqQ.headReq == REQ_SLOT_TAG_NONE) && !notCompletedNandReqCnt && !blockedReqCnt);
 	}
 }
 

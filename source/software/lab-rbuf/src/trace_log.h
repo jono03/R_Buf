@@ -22,13 +22,19 @@
 #ifndef TRACE_MAX_RECORDS
 #define TRACE_MAX_RECORDS		500000
 #endif
+#ifndef TRACE_UART_DUMP
+#define TRACE_UART_DUMP			0			//1 = dump the log over UART when the device has been idle for 5 s (fallback when JTAG dump does not work)
+#endif
+#ifndef TRACE_UART_MIN_MS
+#define TRACE_UART_MIN_MS		0			//with TRACE_UART_DUMP: only records whose firmware-internal latency >= this many ms (0 = all)
+#endif
 #ifndef TRACE_TIME_SHIFT
 #define TRACE_TIME_SHIFT		6			//unit = 64 XTime counts (about 0.19 us), int32 range about 413 s
 #endif
 
 #define TRACE_HDR_BYTES			0x1000
 #define TRACE_MAGIC				0x45435254	//"TRCE"
-#define TRACE_FORMAT_VERSION	2
+#define TRACE_FORMAT_VERSION	3
 
 //TRACE_REC.flags
 #define TRACE_F_BUF_HIT			0x0001	//b0: buffer hit, no NAND request of its own
@@ -52,7 +58,9 @@ typedef struct _TRACE_REC {
 	unsigned short aheadCnt;		//requests in the die queue when this read was inserted
 	int dXferIssue;					//IssueNandReq for REQ_CODE_READ_TRANSFER
 	int dTrigDone;					//trigger completion confirmed (reqCode becomes READ_TRANSFER)
-	unsigned char pad[8];
+	unsigned short schedTrig;		//(v3) SchedulingNandReq() calls between trigger issue and trigger done (clamped to 65535)
+	unsigned short schedXfer;		//(v3) SchedulingNandReq() calls between transfer issue and transfer done
+	unsigned char pad[4];
 } TRACE_REC;
 
 typedef char trace_rec_size_must_be_64[(sizeof(TRACE_REC) == 64) ? 1 : -1];
@@ -82,6 +90,9 @@ typedef struct _TRACE_HDR {
 #if (TRACE_ENABLE == 1)
 
 void TraceInit(void);
+void TraceSlotAlloc(unsigned int reqSlotTag);
+void TraceSchedTick(void);
+void TraceIdleDump(unsigned int idle);
 void TraceSetFetch(void);
 void TraceBegin(unsigned int reqSlotTag, unsigned int reqCode, unsigned int startLba);
 void TraceBufAlloc(unsigned int reqSlotTag);
@@ -98,6 +109,9 @@ void TraceDmaStart(unsigned int reqSlotTag);
 void TraceDmaEnd(unsigned int reqSlotTag);
 
 #define TRACE_INIT()							TraceInit()
+#define TRACE_SLOT_ALLOC(tag)					TraceSlotAlloc(tag)
+#define TRACE_SCHED_TICK()						TraceSchedTick()
+#define TRACE_IDLE_DUMP(idle)					TraceIdleDump(idle)
 #define TRACE_SET_FETCH()						TraceSetFetch()
 #define TRACE_BEGIN(tag, code, lba)				TraceBegin((tag), (code), (lba))
 #define TRACE_BUF_ALLOC(tag)					TraceBufAlloc(tag)
@@ -116,6 +130,9 @@ void TraceDmaEnd(unsigned int reqSlotTag);
 #else
 
 #define TRACE_INIT()							do {} while(0)
+#define TRACE_SLOT_ALLOC(tag)					do {} while(0)
+#define TRACE_SCHED_TICK()						do {} while(0)
+#define TRACE_IDLE_DUMP(idle)					do {} while(0)
 #define TRACE_SET_FETCH()						do {} while(0)
 #define TRACE_BEGIN(tag, code, lba)				do {} while(0)
 #define TRACE_BUF_ALLOC(tag)					do {} while(0)

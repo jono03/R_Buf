@@ -138,6 +138,8 @@ void SchedulingNandReq()
 {
 	int chNo;
 
+	TRACE_SCHED_TICK();
+
 	for(chNo = 0; chNo < USER_CHANNELS; chNo++)
 		SchedulingNandReqPerCh(chNo);
 }
