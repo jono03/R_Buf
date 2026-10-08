@@ -194,6 +194,25 @@ def main():
           % (sum(1 for r, _, _ in rows if r["flags"] & 1), sum(1 for r, _, _ in rows if r["flags"] & 0x10),
              sum(1 for r, _, _ in rows if r["flags"] & 2), sum(1 for r, _, _ in rows if r["flags"] & 8)))
 
+    # ---- sanity checks (compare with the expected values in docs/experiment-plan-2026-10-09.md section 3-5) ----
+    order = ["dBufAlloc", "dEnqueue", "dIssue", "dTrigDone", "dXferIssue", "dNandDone", "dDmaStart", "dDmaEnd"]
+    nand_recs = [r for r, _, _ in rows if not (r["flags"] & 0x11)]
+    bad = [r for r in nand_recs if any(r[order[i]] > r[order[i + 1]] for i in range(len(order) - 1))]
+    miss_recs = nand_recs
+    print("sanity: records with NAND access=%d, time-order violations=%d (should be ~0)" % (len(nand_recs), len(bad)))
+    if bad:
+        print("  first violations (seq): %s" % ", ".join(str(r["seq"]) for r in bad[:5]))
+    if miss_recs:
+        print("sanity: R-Buf read-entry flag on %.1f%% of NAND reads (R-Buf build: ~100%%, S-Buf build: 0%%)" %
+              (100.0 * sum(1 for r in miss_recs if r["flags"] & 2) / len(miss_recs)))
+    print("sanity: buffer-hit reads %.2f%% (random 4KB reads over 8GB: expect well under 1%%)" %
+          (100.0 * sum(1 for r, _, _ in rows if r["flags"] & 1) / len(rows)))
+    if host:
+        fbs = sorted((host[r["seq"]] - t * unit_ms) for r, _, t in rows if r["seq"] in host)
+        neg = sum(1 for x in fbs if x < 0)
+        print("sanity: fetch-before (host - firmware): median=%.3f ms, p99=%.3f ms, negative=%d of %d "
+              "(negative or large median = matching error or clock/unit problem)" % (pct(fbs, 50), pct(fbs, 99), neg, len(fbs)))
+
     keys = ["buffer", "dieq", "loop", "xferwait", "nanddma"]
 
     def summarize(sel, title):
