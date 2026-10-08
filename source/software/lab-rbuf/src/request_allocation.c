@@ -46,6 +46,7 @@
 #include "xil_printf.h"
 #include <assert.h>
 #include "memory_map.h"
+#include "trace_log.h"
 
 P_REQ_POOL reqPoolPtr;
 FREE_REQUEST_QUEUE freeReqQ;
@@ -378,6 +379,8 @@ void SelectiveGetFromNvmeDmaReqQ(unsigned int reqSlotTag)
 
 void PutToNandReqQ(unsigned int reqSlotTag, unsigned chNo, unsigned wayNo)
 {
+	TRACE_ENQUEUE(reqSlotTag, nandReqQ[chNo][wayNo].reqCnt);
+
 	if(nandReqQ[chNo][wayNo].tailReq != REQ_SLOT_TAG_NONE)
 	{
 		reqPoolPtr->reqPool[reqSlotTag].prevReq = nandReqQ[chNo][wayNo].tailReq;

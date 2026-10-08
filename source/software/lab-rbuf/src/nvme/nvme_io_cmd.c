@@ -60,6 +60,7 @@
 
 #include "../ftl_config.h"
 #include "../request_transform.h"
+#include "../trace_log.h"
 
 void handle_nvme_io_read(unsigned int cmdSlotTag, NVME_IO_COMMAND *nvmeIOCmd)
 {
@@ -68,6 +69,8 @@ void handle_nvme_io_read(unsigned int cmdSlotTag, NVME_IO_COMMAND *nvmeIOCmd)
 	//IO_READ_COMMAND_DW15 readInfo15;
 	unsigned int startLba[2];
 	unsigned int nlb;
+
+	TRACE_SET_FETCH();
 
 	readInfo12.dword = nvmeIOCmd->dword[12];
 	//readInfo13.dword = nvmeIOCmd->dword[13];

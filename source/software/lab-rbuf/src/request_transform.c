@@ -57,6 +57,7 @@
 #include "nvme/host_lld.h"
 #include "memory_map.h"
 #include "ftl_config.h"
+#include "trace_log.h"
 
 P_ROW_ADDR_DEPENDENCY_TABLE rowAddrDependencyTablePtr;
 
@@ -113,6 +114,7 @@ void ReqTransNvmeToSlice(unsigned int cmdSlotTag, unsigned int startLba, unsigne
 	reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.nvmeBlockOffset = nvmeBlockOffset;
 	reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.numOfNvmeBlock = tempNumOfNvmeBlock;
 
+	TRACE_BEGIN(reqSlotTag, reqCode, startLba);
 	PutToSliceReqQ(reqSlotTag);
 
 	tempLsa++;
@@ -135,6 +137,7 @@ void ReqTransNvmeToSlice(unsigned int cmdSlotTag, unsigned int startLba, unsigne
 		reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.nvmeBlockOffset = nvmeBlockOffset;
 		reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.numOfNvmeBlock = tempNumOfNvmeBlock;
 
+		TRACE_BEGIN(reqSlotTag, reqCode, startLba);
 		PutToSliceReqQ(reqSlotTag);
 
 		tempLsa++;
@@ -158,6 +161,7 @@ void ReqTransNvmeToSlice(unsigned int cmdSlotTag, unsigned int startLba, unsigne
 	reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.nvmeBlockOffset = nvmeBlockOffset;
 	reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.numOfNvmeBlock = tempNumOfNvmeBlock;
 
+	TRACE_BEGIN(reqSlotTag, reqCode, startLba);
 	PutToSliceReqQ(reqSlotTag);
 }
 
@@ -223,8 +227,11 @@ void DataReadFromNand(unsigned int originReqSlotTag)
 		UpdateDataBufEntryInfoBlockingReq(reqPoolPtr->reqPool[reqSlotTag].dataBufInfo.entry, reqSlotTag);
 		reqPoolPtr->reqPool[reqSlotTag].nandInfo.virtualSliceAddr = virtualSliceAddr;
 
+		TRACE_LINK(reqSlotTag, originReqSlotTag);
 		SelectLowLevelReqQ(reqSlotTag);
 	}
+	else
+		TRACE_UNMAPPED(originReqSlotTag);
 }
 
 
@@ -241,18 +248,22 @@ void ReqTransSliceToLowLevel()
 		if(reqSlotTag == REQ_SLOT_TAG_FAIL)
 			return ;
 
+		TRACE_BUF_ALLOC(reqSlotTag);
+
 		//allocate a data buffer entry for this request
 		dataBufEntry = CheckDataBufHit(reqSlotTag);
 		if(dataBufEntry != DATA_BUF_FAIL)
 		{
 			//data buffer hit
 			reqPoolPtr->reqPool[reqSlotTag].dataBufInfo.entry = dataBufEntry;
+			TRACE_ENTRY(reqSlotTag, dataBufEntry, 1);
 		}
 		else
 		{
 			//data buffer miss, allocate a new buffer entry
 			dataBufEntry = AllocateDataBuf(reqPoolPtr->reqPool[reqSlotTag].reqCode);
 			reqPoolPtr->reqPool[reqSlotTag].dataBufInfo.entry = dataBufEntry;
+			TRACE_ENTRY(reqSlotTag, dataBufEntry, 0);
 
 			//clear the allocated data buffer entry being used by a previous request
 			EvictDataBufEntry(reqSlotTag);
@@ -607,6 +618,7 @@ void IssueNvmeDmaReq(unsigned int reqSlotTag)
 	}
 	else if(reqPoolPtr->reqPool[reqSlotTag].reqCode == REQ_CODE_TxDMA)
 	{
+		TRACE_DMA_START(reqSlotTag);
 		while(numOfNvmeBlock < reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.numOfNvmeBlock)
 		{
 			set_auto_tx_dma(reqPoolPtr->reqPool[reqSlotTag].nvmeCmdSlotTag, dmaIndex, devAddr, NVME_COMMAND_AUTO_COMPLETION_ON);
@@ -649,7 +661,10 @@ void CheckDoneNvmeDmaReq()
 				txDone = check_auto_tx_dma_partial_done(reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.reqTail , reqPoolPtr->reqPool[reqSlotTag].nvmeDmaInfo.overFlowCnt);
 
 			if(txDone)
+			{
+				TRACE_DMA_END(reqSlotTag);
 				SelectiveGetFromNvmeDmaReqQ(reqSlotTag);
+			}
 		}
 
 		reqSlotTag = prevReq;

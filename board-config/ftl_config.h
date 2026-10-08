@@ -67,9 +67,9 @@
 #define RBUF_ENTRY_COUNT	(1 * USER_DIES)
 #endif
 
-//TRACE_ENABLE: per-request read trace log (not implemented yet, keep 0)
+//TRACE_ENABLE: 1 = per-request read trace log in DRAM (trace_log.c, firmware-spec section 3). 0 = hooks compiled out
 #ifndef TRACE_ENABLE
-#define TRACE_ENABLE	0
+#define TRACE_ENABLE	1
 #endif
 
 //VERIFY_PRINT: 1 = print buffer counters over UART every 10 s (verification builds only).

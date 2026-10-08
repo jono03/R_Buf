@@ -51,6 +51,7 @@
 #include "xil_printf.h"
 #include <assert.h>
 #include "memory_map.h"
+#include "trace_log.h"
 
 
 P_DATA_BUF_MAP dataBufMapPtr;
@@ -108,6 +109,8 @@ void InitDataBuf()
 
 	for(bufEntry = 0; bufEntry < AVAILABLE_TEMPORARY_DATA_BUFFER_ENTRY_COUNT; bufEntry++)
 		tempDataBufMapPtr->tempDataBuf[bufEntry].blockingReqTail =  REQ_SLOT_TAG_NONE;
+
+	TRACE_INIT();
 
 	//boot banner (spec D3): one line with the build switches
 	xil_printf("[ RBUF=%d RBUF_ENTRIES=%d/%d TRACE=%d VERIFY=%d ]\r\n", RBUF_ENABLE,

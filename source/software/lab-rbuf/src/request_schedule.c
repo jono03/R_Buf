@@ -49,6 +49,7 @@
 #include <assert.h>
 #include "xil_printf.h"
 #include "memory_map.h"
+#include "trace_log.h"
 #include "nvme/debug.h"
 
 P_COMPLETE_FLAG_TABLE completeFlagTablePtr;
@@ -656,12 +657,14 @@ void IssueNandReq(unsigned int chNo, unsigned int wayNo)
 	{
 		dieStateTablePtr->dieState[chNo][wayNo].reqStatusCheckOpt = REQ_STATUS_CHECK_OPT_CHECK;
 
+		TRACE_TRIG_ISSUE(reqSlotTag, chNo, wayNo);
 		V2FReadPageTriggerAsync(&chCtlReg[chNo], wayNo, rowAddr);
 	}
 	else if(reqPoolPtr->reqPool[reqSlotTag].reqCode == REQ_CODE_READ_TRANSFER)
 	{
 		dieStateTablePtr->dieState[chNo][wayNo].reqStatusCheckOpt = REQ_STATUS_CHECK_OPT_COMPLETION_FLAG;
 
+		TRACE_XFER_ISSUE(reqSlotTag);
 		errorInfo = (unsigned int*)(&eccErrorInfoTablePtr->errorInfo[chNo][wayNo]);
 		completion = (unsigned int*)(&completeFlagTablePtr->completeFlag[chNo][wayNo]);
 
@@ -900,11 +903,18 @@ void ExecuteNandReq(unsigned int chNo, unsigned int wayNo, unsigned int reqStatu
 			if(reqStatus == REQ_STATUS_DONE)
 			{
 				if(reqPoolPtr->reqPool[reqSlotTag].reqCode == REQ_CODE_READ)
+				{
+					TRACE_TRIG_DONE(reqSlotTag);
 					reqPoolPtr->reqPool[reqSlotTag].reqCode = REQ_CODE_READ_TRANSFER;
+				}
 				else
 				{
+					if(reqPoolPtr->reqPool[reqSlotTag].reqCode == REQ_CODE_READ_TRANSFER)
+						TRACE_NAND_DONE(reqSlotTag);
+
 					retryLimitTablePtr->retryLimit[chNo][wayNo] = RETRY_LIMIT;
 					GetFromNandReqQ(chNo, wayNo, reqStatus, reqPoolPtr->reqPool[reqSlotTag].reqCode);
+					TRACE_DIE_DONE(chNo, wayNo);
 				}
 
 				dieStateTablePtr->dieState[chNo][wayNo].dieState = DIE_STATE_IDLE;
