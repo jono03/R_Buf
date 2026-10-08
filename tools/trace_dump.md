@@ -43,6 +43,7 @@ python3 tools/trace_parse.py trace.bin --csv trace.csv \
 
 - 헤더 값(카운터: GC, 읽기 eviction, 읽기 칸 할당, 무효화), 레코드 수, 중단 플래그 출력.
 - 읽기별 구간(buffer / dieq / loop / xferwait / nanddma)과 p99 이상·1초 이상 정지 읽기의 구간 비중, 정지 목록.
+- 구간 요약은 두 가지다: **[team rule]**(팀이 고정한 규칙, 주 결과) 과 **[polling-adjusted, secondary]**(트리거·전송·DMA 중 `--nand-ms` 초과분을 loop로 옮긴 보조 보기, 기준값은 추정).
 - 시간 단위는 `2^timeShift` XTime count(기본 timeShift 6 ≈ 0.19 us). 헤더의 `countsPerSecond`로 환산한다.
 - 호스트 fio 지연 로그와의 짝짓기(fetch 전 대기)는 절차 문서 12.1대로 요청 순서 + LBA로 별도 수행.
 

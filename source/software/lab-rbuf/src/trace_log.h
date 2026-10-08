@@ -111,7 +111,11 @@ void TraceDmaEnd(unsigned int reqSlotTag);
 #define TRACE_INIT()							TraceInit()
 #define TRACE_SLOT_ALLOC(tag)					TraceSlotAlloc(tag)
 #define TRACE_SCHED_TICK()						TraceSchedTick()
+#if (TRACE_UART_DUMP == 1)
 #define TRACE_IDLE_DUMP(idle)					TraceIdleDump(idle)
+#else
+#define TRACE_IDLE_DUMP(idle)					do {} while(0)	//no call, no cost in the main loop when the UART dump is off
+#endif
 #define TRACE_SET_FETCH()						TraceSetFetch()
 #define TRACE_BEGIN(tag, code, lba)				TraceBegin((tag), (code), (lba))
 #define TRACE_BUF_ALLOC(tag)					TraceBufAlloc(tag)

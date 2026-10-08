@@ -13,9 +13,11 @@ trace.bin = raw memory dump starting at TRACE_BASE_ADDR (0x00300000): 4KB header
   xferwait = dXferIssue - dTrigDone              (read transfer waits behind other channel work)
   nanddma  = (dTrigDone - dIssue) + (dNandDone - dXferIssue) + (dDmaEnd - dDmaStart)
 
-Polling-delay split (review 10-08): completion is only noticed when the main loop runs the scheduler, so
-(dTrigDone - dIssue), (dNandDone - dXferIssue) and the host DMA time contain loop delay. Any part of those above
---nand-ms (default 0.3 ms, about the whole read-only latency) is reported as "loop" instead of "nanddma".
+Two views are printed. The primary view follows the team decomposition rule exactly (trigger, transfer and DMA time
+all count as nanddma; the polling caveat is a stated limitation). The secondary "polling-adjusted" view is NOT part of
+the pre-fixed rule: completion is only noticed when the main loop runs the scheduler, so any part of
+(dTrigDone - dIssue), (dNandDone - dXferIssue) and the host DMA time above --nand-ms (default 0.3 ms, about the whole
+read-only latency; an assumption, tune it) is reported as "loop" instead of "nanddma".
 The die-queue wait is flagged "dieq-suspect" when it exceeds 3 x (aheadCnt+1) x --die-ms (default 0.57 ms = one program per die at 14K IOPS / 8 dies).
 schedTrig / schedXfer = number of SchedulingNandReq() calls during the trigger / transfer wait: a long wait with
 almost no calls means the loop did not poll (case B); many calls with a long wait means the NAND/die was really busy.
@@ -69,7 +71,10 @@ def load(path):
 
 def segments(r, nand_ticks):
     """segment lengths in ticks (units of 2**timeShift XTime counts)
-    nand_ticks = physical part allowed for the trigger wait, the transfer wait and the host DMA"""
+    nand_ticks = None: team rule (everything counts as nanddma). Otherwise the part of trigger / transfer / DMA
+    time above nand_ticks is moved to loop (secondary, polling-adjusted view)"""
+    if nand_ticks is None:
+        nand_ticks = 1 << 62
     flags = r["flags"]
     seg = dict(buffer=0, dieq=0, loop=0, xferwait=0, nanddma=0)
     if flags & (0x0001 | 0x0010):              # buffer hit or unmapped: no NAND request
@@ -92,17 +97,19 @@ def segments(r, nand_ticks):
 
 
 def load_fio(paths):
-    """fio lat logs -> list of (time_ms, latency_ms, offset) in completion order"""
+    """fio lat logs -> list of (time_ms, latency_ms, offset); completion order inside each file, files in argument order"""
     out = []
     for path in paths:
+        part = []
         for line in open(path):
             f = [x.strip() for x in line.split(",")]
             if len(f) < 5 or not f[0].isdigit():
                 continue
             if f[2] != "0":                      # direction 0 = read
                 continue
-            out.append((int(f[0]), int(f[1]) / 1e6, int(f[4])))
-    out.sort()
+            part.append((int(f[0]), int(f[1]) / 1e6, int(f[4])))
+        part.sort()          # sort inside one file only: each fio job log has its own clock
+        out.extend(part)     # files are used in the order given on the command line (ro first, then reader)
     return out
 
 
@@ -154,8 +161,10 @@ def main():
 
     nand_ticks = int(nand_ms / unit_ms)
     rows = []
+    adj = {}
     for r in recs:
-        s = segments(r, nand_ticks)
+        s = segments(r, None)                  # primary: team rule
+        adj[r["seq"]] = segments(r, nand_ticks)   # secondary: polling-adjusted
         total = r["dDmaEnd"]
         rows.append((r, s, total))
 
@@ -167,14 +176,15 @@ def main():
 
     if csv_path:
         with open(csv_path, "w") as f:
-            f.write("seq,lba,flags,aheadCnt,schedTrig,schedXfer,total_ms,host_ms,fetchbefore_ms,buffer_ms,dieq_ms,loop_ms,xferwait_ms,nanddma_ms\n")
+            f.write("seq,lba,flags,aheadCnt,schedTrig,schedXfer,total_ms,host_ms,fetchbefore_ms,buffer_ms,dieq_ms,loop_ms,xferwait_ms,nanddma_ms,loop_adj_ms,nanddma_adj_ms\n")
             for r, s, total in rows:
                 hm = host.get(r["seq"])
-                f.write("%d,%d,0x%04x,%d,%d,%d,%.4f,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
+                a = adj[r["seq"]]
+                f.write("%d,%d,0x%04x,%d,%d,%d,%.4f,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n" % (
                     r["seq"], r["lba"], r["flags"], r["aheadCnt"], r["schedTrig"], r["schedXfer"], total * unit_ms,
                     "%.4f" % hm if hm is not None else "", "%.4f" % (hm - total * unit_ms) if hm is not None else "",
                     s["buffer"] * unit_ms, s["dieq"] * unit_ms, s["loop"] * unit_ms,
-                    s["xferwait"] * unit_ms, s["nanddma"] * unit_ms))
+                    s["xferwait"] * unit_ms, s["nanddma"] * unit_ms, a["loop"] * unit_ms, a["nanddma"] * unit_ms))
         print("csv written: %s" % csv_path)
 
     totals = sorted(t * unit_ms for _, _, t in rows)
@@ -195,19 +205,24 @@ def main():
         print("%s (%d reads): " % (title, len(sel)) + ", ".join(
             "%s %.1f%% (%.1f ms)" % (k, 100.0 * tot[k] / grand, tot[k]) for k in keys))
 
-    summarize(rows, "all reads")
+    def view(sel, title):
+        summarize(sel, title + " [team rule]")
+        summarize([(r, adj[r["seq"]], t) for r, _, t in sel], title + " [polling-adjusted, secondary]")
+
+    view(rows, "all reads")
     p99 = pct(totals, 99)
-    summarize([x for x in rows if x[2] * unit_ms > p99], "slower than p99")
+    view([x for x in rows if x[2] * unit_ms > p99], "slower than p99")
     if host:
         stalls = [x for x in rows if host.get(x[0]["seq"], x[2] * unit_ms) >= stall_ms]
         print("stalls selected by HOST latency >= %.0f ms (firmware-only selection would miss fetch-before waits)" % stall_ms)
     else:
         stalls = [x for x in rows if x[2] * unit_ms >= stall_ms]
-    summarize(stalls, "stalls >= %.0f ms" % stall_ms)
+    view(stalls, "stalls >= %.0f ms" % stall_ms)
 
     print("\nstall list (seq, host ms, firmware ms, fetch-before ms, dominant segment, per-segment ms, calls):")
     for r, s, total in stalls:
         dom = max(keys, key=lambda k: s[k])
+        dom_adj = max(keys, key=lambda k: adj[r["seq"]][k])
         fw = total * unit_ms
         hm = host.get(r["seq"])
         fb = (hm - fw) if hm is not None else None
@@ -216,9 +231,9 @@ def main():
         sus = ""
         if not (r["flags"] & 0x11) and s["dieq"] * unit_ms > 3 * (r["aheadCnt"] + 1) * die_ms:
             sus = " dieq-suspect(polling?)"
-        print("  seq %d  host=%s  fw=%.1f ms  fetch-before=%s  -> %s  [%s]  ahead=%d  calls trig=%d xfer=%d  flags=0x%04x%s" % (
+        print("  seq %d  host=%s  fw=%.1f ms  fetch-before=%s  -> %s (polling-adjusted: %s)  [%s]  ahead=%d  calls trig=%d xfer=%d  flags=0x%04x%s" % (
             r["seq"], ("%.1f ms" % hm) if hm is not None else "n/a", fw,
-            ("%.1f ms" % fb) if fb is not None else "n/a", dom,
+            ("%.1f ms" % fb) if fb is not None else "n/a", dom, dom_adj,
             " ".join("%s=%.1f" % (k, s[k] * unit_ms) for k in keys),
             r["aheadCnt"], r["schedTrig"], r["schedXfer"], r["flags"], sus))
 
