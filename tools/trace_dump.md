@@ -36,10 +36,10 @@ QD8처럼 레코드가 많으면 `-DTRACE_UART_MIN_MS=10`으로 빌드해 10 ms 
 
 ```
 python3 tools/trace_parse.py trace.bin --csv trace.csv \
-    --fio-log <TAG>_ro_clat.1.log --fio-log <TAG>_reader_clat.2.log
+    --fio-log <TAG>_ro_clat.2.log --fio-log <TAG>_reader_clat.3.log
 ```
 
-`--fio-log`(fio `write_lat_log`, `log_offset=1`)를 주면 호스트 지연으로 정지를 고르고 fetch 전 대기를 계산한다(fio 로그 파일 이름의 번호는 실행마다 다를 수 있으니 `ls`로 확인). 호스트 지연 없이도 실행되지만 fetch 전(N2) 정지는 보이지 않는다.
+`--fio-log`(fio `write_lat_log`, `log_offset=1`)를 주면 호스트 지연으로 정지를 고르고 fetch 전 대기를 계산한다(번호는 fio 파일 안의 job 순서다: prefill=1, ro=2, reader=3, writer=4. `rbuf2`에서 `_reader_clat.3.log`였던 것과 같다. 항상 `ls`로 확인하고, **ro 로그를 먼저** 쓴다). 호스트 지연 없이도 실행되지만 fetch 전(N2) 정지는 보이지 않는다.
 
 - 헤더 값(카운터: GC, 읽기 eviction, 읽기 칸 할당, 무효화), 레코드 수, 중단 플래그 출력.
 - 읽기별 구간(buffer / dieq / loop / xferwait / nanddma)과 p99 이상·1초 이상 정지 읽기의 구간 비중, 정지 목록.
