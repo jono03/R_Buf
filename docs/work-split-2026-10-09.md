@@ -61,7 +61,12 @@ runlog.md                      (회차마다 한 줄, 아래 5절)
    mrd -bin -file <TAG>_trace.bin 0x00300000 <1024 + N×16>
    ```
    파일 크기는 `4096 + N×64` 바이트여야 한다(S1: N=270,807, 17,335,744바이트). **덤프 시작과 끝 시각을 기록한다.**
-5. 호스트에서 묶기: `cd ~/m12 && tar czf <TAG>_host.tgz <TAG>*`
+5. 호스트에서 `dmesg` 전체와 인터럽트 상태를 저장한 뒤 묶기(`Disabling IRQ`, timeout 줄은 `grep timeout|abort|reset`에 안 걸리는 것도 있으므로 전체를 남긴다):
+   ```
+   sudo dmesg > ${TAG}_dmesg_full.txt
+   cat /proc/interrupts | grep -i nvme > ${TAG}_interrupts.txt
+   cd ~/m12 && tar czf <TAG>_host.tgz <TAG>*
+   ```
 6. 3개 파일을 회차 폴더에 업로드하고 `runlog.md`에 한 줄 추가.
 7. 업로드를 확인한 뒤 호스트를 끄고 다음 회차 부팅.
 
@@ -129,7 +134,8 @@ python3 trace_parse.py <TAG>_trace.bin --fio-log <TAG>_ro_clat.2.log --fio-log <
 | fio reader 읽기(14,175건) | **최대 지연 4.82 s**, 평균 5.4 ms, p99 18 ms |
 | 쓰기 폭주 | 16GiB, 76 s, 215 MiB/s, `gcCnt` 0 |
 
-- 호스트가 본 최대 4.82초와 펌웨어 내부 최대 25.4 ms가 크게 다르다. **정지가 명령을 가져오기 전(fetch-before)에 있다는 가설**이 서지만, 지금은 최대값 두 개를 비교한 추정이다. 요청 단위 짝짓기(`--fio-log`)로 확인하는 것이 첫 분석 과제다.
+- 호스트가 본 최대 4.82초와 펌웨어 내부 최대 25.4 ms가 크게 다르다. 이 차이는 펌웨어가 명령을 가져오기 **전**(fetch-before)일 수도 있고, 펌웨어가 DMA를 끝낸 **뒤**(완료 항목 게시, MSI 인터럽트 전달, 호스트 처리)일 수도 있다. 기록은 둘을 구분하지 못한다(`trace_parse.py`의 `fetch-before`는 "호스트 − 펌웨어" 전체이며 이름과 달리 두 구간을 합친 값이다). 요청 단위 짝짓기(`--fio-log`)로 크기를 보는 것이 첫 분석 과제이고, 위치 판정은 별도 근거가 필요하다.
+- R1에서 호스트 `dmesg`에 `Disabling IRQ #150`(NVMe 인터럽트 비활성화)과 `I/O ... timeout, completion polled`가 나왔고 fio 최대 지연이 30.17 s(커널 I/O timeout 30 s)였다. 인터럽트가 꺼진 큐의 완료가 timeout 때 폴링으로만 회수된 호스트 쪽 인공물일 가능성이 있다. 이 가능성이 확인되기 전에는 호스트 최대 지연을 펌웨어 정지로 해석하지 않는다.
 - 이 회차는 시험 회차를 겸한다. 짝짓기가 처음으로 실제 데이터에 적용된다.
 
 ## 8. 진행 순서와 동기화
