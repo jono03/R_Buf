@@ -225,8 +225,8 @@ def main():
         print("csv written: %s" % csv_path)
 
     totals = sorted(t * unit_ms for _, _, t in rows)
-    print("firmware-internal read latency (tFetch..DMA end): p50=%.3f ms p99=%.3f ms p99.9=%.3f ms max=%.3f ms"
-          % (pct(totals, 50), pct(totals, 99), pct(totals, 99.9), totals[-1]))
+    print("firmware-internal read latency (tFetch..DMA end): p50=%.3f ms p95=%.3f ms p99=%.3f ms p99.9=%.3f ms max=%.3f ms"
+          % (pct(totals, 50), pct(totals, 95), pct(totals, 99), pct(totals, 99.9), totals[-1]))
     print("flags: buf-hit=%d unmapped=%d rbuf-entry=%d saturated=%d"
           % (sum(1 for r, _, _ in rows if r["flags"] & 1), sum(1 for r, _, _ in rows if r["flags"] & 0x10),
              sum(1 for r, _, _ in rows if r["flags"] & 2), sum(1 for r, _, _ in rows if r["flags"] & 8)))
