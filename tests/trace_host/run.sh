@@ -26,4 +26,8 @@ test "$(grep -c '^\[TRC\] R ' dump.txt)" = "3" || { echo "FAIL: expected 3 [TRC]
 test "$(grep -c '^\[TRC\] BEGIN' dump.txt)" = "1" || { echo "FAIL: expected exactly one dump"; exit 1; }
 python3 -I "$TOOLS/trace_uart2bin.py" dump.txt dump.bin
 python3 -I "$TOOLS/trace_parse.py" dump.bin --stall-ms 1000 | tail -6
+# trace_lookup.py: firmware record by LBA (no -I: it imports trace_parse from its own directory)
+LBA=$(python3 -c "import sys; sys.path.insert(0, '$TOOLS'); import trace_parse as t; print(t.load('dump.bin')[1][-1]['lba'])")
+python3 "$TOOLS/trace_lookup.py" dump.bin "$LBA" | grep -q "fw_total=" || { echo "FAIL: trace_lookup"; exit 1; }
+echo "LOOKUP OK"
 echo "UART DUMP PIPELINE OK"
