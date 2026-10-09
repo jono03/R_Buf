@@ -107,6 +107,19 @@ python3 trace_parse.py <TAG>_trace.bin --fio-log <TAG>_ro_clat.2.log --fio-log <
 
 음수가 많거나 `matched`가 낮으면 짝짓기 오류이므로 **해석을 믿지 말고 실험 담당에게 알린다.**
 
+### 6-1b. 호스트 정지의 위치 (`trace_where.py`)
+
+`trace_parse.py`의 `fetch-before`는 "호스트 − 펌웨어" 전체라서 명령을 가져오기 전과 DMA 이후를 구분하지 못한다. 구분은 `trace_where.py`로 한다(같은 폴더에 `trace_parse.py`가 있어야 한다).
+
+```
+python3 trace_where.py <TAG>_trace.bin --fio-log <TAG>_ro_clat.2.log --fio-log <TAG>_reader_clat.3.log --stall-ms 1000
+```
+
+- fio 로그와 펌웨어 XTime의 시계를 빠른 읽기(2 ms 미만)로 맞춘 뒤, 1초 이상 호스트 읽기마다 `before`(펌웨어가 가져오기 전), `fw`(펌웨어 구간), `after`(DMA 이후)로 나눈다.
+- 출력의 `clock offset`과 `drift`(처음 10% 대비 마지막 10%의 어긋남)가 정지 길이(초 단위)보다 훨씬 작은지 먼저 본다.
+- 한 LBA에 기록이 여러 건이면 짝짓기가 모호해지므로 그 정지는 따로 표시한다.
+- `trace_lookup.py <TAG>_trace.bin <lba...>`는 특정 LBA의 펌웨어 기록만 본다(호스트 지연이 큰 읽기 몇 건을 빠르게 확인할 때).
+
 ### 6-2. 보고할 것
 
 1. sanity 줄 전부
