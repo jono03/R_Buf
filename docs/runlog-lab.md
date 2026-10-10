@@ -1,0 +1,18 @@
+# runlog (회차마다 한 줄)
+
+| TAG | 빌드 | 부팅 조건 | recCount | 1초 이상 정지 | dmesg / 인터럽트 | 덤프 시간 | 비고 |
+|---|---|---|---|---|---|---|---|
+| sbuf_m1_r1 | S-Buf (RBUF=0), 커밋 2340e73 | 불량 블록 테이블 새로 만듦(Erase FAIL 출력) | 270807 | 4건, 합 8.9 s, 최대 4.82 s | timeout/abort/reset 없음. 전체 dmesg, 인터럽트는 저장 안 함(IRQ 상태 미확인) | 미측정 | 시험 회차 겸용 |
+| rbuf_m1_r1 | R-Buf (RBUF=1), 커밋 2340e73 | 불량 블록 테이블 있음(Erase User block space) | 269872 | 11건, 합 83.8 s, 최대 30.17 s(마지막 1건) | IRQ 150 비활성화(167.5 s), I/O tag 96 QID 5 timeout completion polled(300.7 s). 관리 큐 q0 인터럽트 약 199893 | 미측정 | reader 실행이 쓰기보다 27 s 길었음 |
+| sbuf_m1_r2 | S-Buf (RBUF=0), 커밋 2340e73 | 테이블 있음(Erase User block space) | 268740 | 5건 합 60.7 s 최대 30.11 s(끝 1건 포함), 끝 제외 4건 30.6 s 최대 15.43 s | IRQ150 비활성 181.1 s, I/O timeout 313.8 s(QID 4) | 미측정 | reader 연장(끝 1건) |
+| rbuf_m1_r2 | R-Buf (RBUF=1), 커밋 2340e73 | 테이블 없음(Erase FAIL 출력, 전체 erase) | 273971 | 16건 합 48.0 s 최대 7.09 s, 끝 1건 없음 | IRQ150 비활성 134.97 s, I/O timeout 없음 | 미측정 | reader와 쓰기 실행 시간 같음(76.40 s) |
+| sbuf_m2_r1 | S-Buf (RBUF=0), 커밋 2340e73 | 테이블 없음(전체 erase) | 301368 | 0건(호스트 최대 29.08 ms, 펌웨어 최대 28.79 ms) | IRQ150 비활성 90.3 s, I/O timeout 없음 | 미측정 | QD8 ROT=10, 쓰기 203 MiB/s 80.6 s, reader 531 MiB |
+| rbuf_m2_r1 | R-Buf (RBUF=1), 커밋 2340e73 | 테이블 없음(전체 erase) | 342081 | 0건(호스트 최대 39.25 ms, 펌웨어 최대 38.83 ms) | IRQ150 비활성 92.4 s, I/O timeout 없음 | 미측정 | QD8 ROT=10, 쓰기 196 MiB/s 83.7 s, reader 737 MiB |
+| sbuf_m1_r3 | S-Buf (RBUF=0), 커밋 2340e73 | 테이블 없음(전체 erase) | 275112 | 4건 합 81.1 s(24.03, 23.49, 4.52, 29.03 끝), 끝 제외 3건 52.0 s 최대 24.03 s, reader 읽기 10.6 MiB뿐 | IRQ150 비활성 104.0 s, I/O timeout 233.9 s(QID 2) | 미측정 | reader 연장 +22.7 s(93.09 vs 70.35 s), 쓰기 233 MiB/s |
+| rbuf_m1_r3 | R-Buf (RBUF=1), 커밋 2340e73 | 테이블 없음(전체 erase) | 269130 | 10건 합 54.5 s 최대 20.57 s(폭주 중), 끝 1건 없음 | IRQ150 비활성 118.5 s, I/O timeout 없음 | 미측정 | reader와 쓰기 실행 시간 같음(75.0 s), 쓰기 218 MiB/s |
+| rbuf16_m2_r1 | R-Buf (RBUF=1), 읽기 칸 16 (RBUF_ENTRY_COUNT=2*USER_DIES, 진단용) | 테이블 없음(Erase FAIL, 전체 erase) | 426590 | 0건 | IRQ150 비활성 301.2 s, I/O timeout 없음 | - | M2 조건(RQD=8 ROT=10), ELF C:\work\elf\rbuf16_trace.elf, check_wrap: 버퍼 대기의 99.2%가 16번째 앞 읽기에 막힘(칸 8 회차 99.7%), 꼬리 buffer 64%→37.6% |
+| rbuf_m1_poll1 | R-Buf (RBUF=1, 칸 8), 커밋 2340e73 소스 | 테이블 없음(Erase FAIL, 전체 erase) | 307384 | 0건 | 폴링 대조: GRUB nvme.poll_queues=4, Cosmos 큐 4 default + 4 poll, io_poll=1, reader io_uring hipri. IRQ146 비활성(394.2 s), I/O timeout 없음 | - | run_one_poll.sh, M1(RQD=1 ROT=60) |
+| rbuf_m1_q4int1 | R-Buf (RBUF=1, 칸 8), 커밋 2340e73 소스 | 테이블 없음(Erase FAIL, 전체 erase) | 274557 | 9건(1.1~18.6 s, 최대 18.6 s) | 폴링 대조의 대조군: GRUB nvme.poll_queues=4 그대로(Cosmos=nvme1, 큐 4 default + 4 poll), reader는 폴링 없음(run_one.sh, rbuf_check.fio). IRQ146 비활성(267.3 s), I/O timeout 없음 | - | M1(RQD=1 ROT=60) |
+| sbuf_m1_poll1 | S-Buf (RBUF=0), 커밋 2340e73 소스, ELF C:\work\elf\sbuf_trace.elf | 테이블 없음(Erase FAIL, 전체 erase) | 274370 | 0건 | 폴링 대조: GRUB nvme.poll_queues=4, 큐 4 default + 4 poll, io_poll=1, reader io_uring hipri. IRQ146 비활성(151.6 s), I/O timeout 없음 | - | run_one_poll.sh, M1(RQD=1 ROT=60) |
+| rbuf_m1_poll2 | R-Buf (RBUF=1, 칸 8), 커밋 2340e73 소스 | 테이블 없음(Erase FAIL, 전체 erase) | 306776 | 0건 | 폴링 대조 반복: GRUB nvme.poll_queues=4, 큐 4 default + 4 poll, io_poll=1, reader io_uring hipri. IRQ146 비활성(157.1 s), I/O timeout 없음 | - | run_one_poll.sh, M1(RQD=1 ROT=60) |
+| rbuf_m1_q4uring1 | R-Buf (RBUF=1, 칸 8), 커밋 2340e73 소스 | (Erase FAIL / Erase User block space) | 275414 | 9건(1.0~9.0 s) | 엔진 대조: GRUB nvme.poll_queues=4, 큐 4 default + 4 poll, io_poll=1, reader io_uring(hipri 없음, 인터럽트). IRQ146 비활성(247.5 s), I/O timeout 없음. 10/10 run-gftl3 과제 직후 부팅, GC 없음 | - | run_one_uring.sh, M1(RQD=1 ROT=60) |
