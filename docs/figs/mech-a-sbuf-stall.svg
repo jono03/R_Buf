@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 490" width="900" height="490" font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','WenQuanYi Zen Hei',sans-serif" font-size="23">
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+<pattern id="d" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><path d="M0,8 L8,0" stroke="#666" stroke-width="2"/></pattern>
+</defs>
+<rect width="900" height="490" fill="#fff"/>
+<text x="450" y="32" text-anchor="middle" font-size="27" font-weight="bold" fill="#111">(a) S-Buf: 읽기가 dirty 칸의 내려쓰기를 기다린다</text>
+<rect x="8" y="90" width="100" height="260" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="58" y="226" text-anchor="middle" font-size="24" font-weight="bold" fill="#111">호스트</text>
+<rect x="130" y="50" width="762" height="410" rx="10" fill="#f4f4f4" stroke="#111" stroke-width="2.5"/>
+<text x="880" y="80" text-anchor="end" font-size="22" font-weight="bold" fill="#111">SSD</text>
+<text x="884" y="482" text-anchor="end" font-size="17" fill="#333">빗금: dirty 칸·쓰기 요청 / 빈 칸: clean·읽기</text>
+<rect x="165" y="208" width="170" height="90" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="250" y="262" text-anchor="middle" font-size="25" fill="#111">펌웨어</text>
+<rect x="400" y="190" width="300" height="130" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="550" y="218" text-anchor="middle" font-size="23" fill="#111">die 큐</text>
+<rect x="760" y="210" width="120" height="90" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="820" y="262" text-anchor="middle" font-size="24" fill="#111">NAND</text>
+<text x="165" y="92" text-anchor="start" font-size="21" fill="#111">버퍼 (읽기·쓰기 공용)</text>
+<rect x="165.0" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="4"/>
+<rect x="194.8" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="224.6" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="254.4" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="284.2" y="100" width="26.8" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="314.0" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="343.8" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="373.5" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="403.3" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="433.1" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="462.9" y="100" width="26.8" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="492.7" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="522.5" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="552.3" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="582.1" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="611.9" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="641.7" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="671.5" y="100" width="26.8" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="701.2" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="731.0" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="760.8" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="790.6" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="820.4" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="850.2" y="100" width="26.8" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<text x="330" y="92" text-anchor="middle" font-size="1" fill="#111"></text>
+<path d="M108,236 L165,236" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="136" cy="212" r="17" fill="#111"/><text x="136" y="220" text-anchor="middle" font-size="22" fill="#fff">①</text>
+<text x="136" y="262" text-anchor="middle" font-size="18" fill="#111">읽기</text>
+<path d="M182,208 L182,142" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="150" cy="176" r="17" fill="#111"/><text x="150" y="184" text-anchor="middle" font-size="22" fill="#fff">②</text>
+<path d="M203,142 L203,176 L560,176 L560,190" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="300" cy="176" r="17" fill="#111"/><text x="300" y="184" text-anchor="middle" font-size="22" fill="#fff">③</text>
+<path d="M700,255 L760,255" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<text x="430" y="160" text-anchor="middle" font-size="19" fill="#111">dirty 칸 내려쓰기</text>
+<rect x="418" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="464" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="510" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="556" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="602" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="648" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="165" y="350" width="600" height="80" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="465.0" y="380" text-anchor="middle" font-size="21" fill="#111">④ 읽기는 ③(NAND 쓰기)가 끝날 때까지 칸을 못 받고 대기</text>
+<text x="465.0" y="408" text-anchor="middle" font-size="21" fill="#111">→ read stall (버퍼 대기)</text>
+<path d="M250,350 L250,298" stroke="#555" stroke-width="3" fill="none" stroke-dasharray="10 7" marker-end="url(#g)"/>
+</svg>

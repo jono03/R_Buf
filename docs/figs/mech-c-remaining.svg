@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 490" width="900" height="490" font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','WenQuanYi Zen Hei',sans-serif" font-size="23">
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+<pattern id="d" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><path d="M0,8 L8,0" stroke="#666" stroke-width="2"/></pattern>
+</defs>
+<rect width="900" height="490" fill="#fff"/>
+<text x="450" y="32" text-anchor="middle" font-size="27" font-weight="bold" fill="#111">(c) R-Buf 이후에도 남는 대기</text>
+<rect x="8" y="90" width="100" height="260" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="58" y="226" text-anchor="middle" font-size="24" font-weight="bold" fill="#111">호스트</text>
+<rect x="130" y="50" width="762" height="410" rx="10" fill="#f4f4f4" stroke="#111" stroke-width="2.5"/>
+<text x="880" y="80" text-anchor="end" font-size="22" font-weight="bold" fill="#111">SSD</text>
+<text x="884" y="482" text-anchor="end" font-size="17" fill="#333">빗금: dirty 칸·쓰기 요청 / 빈 칸: clean·읽기</text>
+<rect x="165" y="208" width="170" height="90" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="250" y="262" text-anchor="middle" font-size="25" fill="#111">펌웨어</text>
+<rect x="400" y="190" width="300" height="130" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="550" y="218" text-anchor="middle" font-size="23" fill="#111">die 큐</text>
+<rect x="760" y="210" width="120" height="90" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="820" y="262" text-anchor="middle" font-size="24" fill="#111">NAND</text>
+<text x="165" y="92" text-anchor="start" font-size="21" fill="#111">읽기 칸 (clean)</text>
+<rect x="165.0" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="197.5" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="230.0" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="262.5" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="295.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="327.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="360.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="392.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="425.0" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="457.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="490.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="522.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="555.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="587.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="620.0" y="100" width="29.5" height="40" fill="#fff" stroke="#111" stroke-width="2"/>
+<rect x="652.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="685.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="717.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="750.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="782.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="815.0" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="847.5" y="100" width="29.5" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<path d="M108,236 L165,236" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="136" cy="212" r="17" fill="#111"/><text x="136" y="220" text-anchor="middle" font-size="22" fill="#fff">①</text>
+<path d="M335,255 L400,255" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="367" cy="226" r="17" fill="#111"/><text x="367" y="234" text-anchor="middle" font-size="22" fill="#fff">②</text>
+<rect x="418" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="464" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="510" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="556" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="602" y="246" width="38" height="40" fill="url(#d)" stroke="#111" stroke-width="2"/>
+<rect x="648" y="246" width="38" height="40" fill="#fff" stroke="#111" stroke-width="4.5"/>
+<text x="667.0" y="275" text-anchor="middle" font-size="24" font-weight="bold" fill="#111">R</text>
+<path d="M700,255 L760,255" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="730" cy="228" r="17" fill="#111"/><text x="730" y="236" text-anchor="middle" font-size="22" fill="#fff">③</text>
+<path d="M820,210 L820,160 L240,160 L240,142" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="520" cy="160" r="17" fill="#111"/><text x="520" y="168" text-anchor="middle" font-size="22" fill="#fff">④</text>
+<path d="M165,112 L108,112" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+<circle cx="136" cy="86" r="17" fill="#111"/><text x="136" y="94" text-anchor="middle" font-size="22" fill="#fff">⑤</text>
+<path d="M165,282 L108,282" stroke="#555" stroke-width="3.5" fill="none" stroke-dasharray="10 7" marker-end="url(#g)"/>
+<circle cx="136" cy="312" r="17" fill="#fff" stroke="#555" stroke-width="2.5"/><text x="136" y="320" text-anchor="middle" font-size="22" fill="#444">⑥</text>
+<rect x="165" y="345" width="350" height="100" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+<text x="340.0" y="375" text-anchor="middle" font-size="20" fill="#111">펌웨어 안: die 큐 대기</text>
+<text x="340.0" y="403" text-anchor="middle" font-size="20" fill="#111">읽기(R)가 앞선 쓰기 뒤에서 대기</text>
+<text x="340.0" y="431" text-anchor="middle" font-size="20" fill="#111">(②→③, 최대 약 10 ms)</text>
+<rect x="530" y="345" width="350" height="100" rx="6" fill="#fff" stroke="#111" stroke-width="2.5" stroke-dasharray="9 6"/>
+<text x="705.0" y="375" text-anchor="middle" font-size="20" fill="#111">펌웨어 기록 밖: ⑥ 완료 통지</text>
+<text x="705.0" y="403" text-anchor="middle" font-size="20" fill="#111">읽기는 끝났는데 호스트가 늦게 앎</text>
+<text x="705.0" y="431" text-anchor="middle" font-size="20" fill="#111">(1 s 이상 정지가 관찰됨)</text>
+</svg>
