@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','WenQuanYi Zen Hei',sans-serif" font-size="27">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#666"/></marker>
+    <pattern id="dirty" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><path d="M0,8 L8,0" stroke="#777" stroke-width="2"/></pattern>
+  </defs>
+  <rect width="900" height="600" fill="#fff"/>
+
+  <!-- host -->
+  <rect x="8" y="100" width="118" height="350" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text x="67" y="285" text-anchor="middle" font-weight="bold">호스트</text>
+
+  <!-- SSD -->
+  <rect x="170" y="8" width="722" height="540" rx="10" fill="#f4f4f4" stroke="#111" stroke-width="2.5"/>
+  <text x="531" y="46" text-anchor="middle" font-weight="bold">SSD (Cosmos+ OpenSSD)</text>
+
+  <!-- buffer -->
+  <text x="190" y="88" font-size="24">버퍼 (128칸)</text>
+  <rect x="190" y="100" width="100" height="54" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text x="240" y="136" text-anchor="middle" font-size="23">읽기 8</text>
+  <rect x="290" y="100" width="560" height="54" fill="url(#dirty)" stroke="#111" stroke-width="2.5"/>
+  <rect x="440" y="108" width="260" height="38" fill="#fff"/>
+  <text x="570" y="136" text-anchor="middle" font-size="23">쓰기 120 (dirty 칸)</text>
+
+  <!-- firmware -->
+  <rect x="190" y="225" width="270" height="120" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text x="340" y="278" text-anchor="middle">펌웨어</text>
+  <text x="340" y="322" text-anchor="middle" font-size="22">(단일 메인 루프)</text>
+
+  <!-- die queue -->
+  <rect x="560" y="225" width="280" height="120" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text x="700" y="268" text-anchor="middle">die 큐</text>
+  <g fill="#fff" stroke="#111" stroke-width="2">
+    <rect x="585" y="288" width="32" height="32"/><rect x="623" y="288" width="32" height="32"/><rect x="661" y="288" width="32" height="32"/>
+  </g>
+  <g fill="url(#dirty)" stroke="#111" stroke-width="2">
+    <rect x="699" y="288" width="32" height="32"/><rect x="737" y="288" width="32" height="32"/><rect x="775" y="288" width="32" height="32"/>
+  </g>
+
+  <!-- NAND -->
+  <rect x="560" y="420" width="280" height="90" rx="6" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text x="700" y="474" text-anchor="middle">NAND (die 8개)</text>
+
+  <!-- 1 submit (outside, dashed) -->
+  <path d="M126,285 L190,285" stroke="#666" stroke-width="3.5" stroke-dasharray="10 7" fill="none" marker-end="url(#g)"/>
+  <circle cx="158" cy="250" r="19" fill="#fff" stroke="#666" stroke-width="2.5"/><text x="158" y="260" text-anchor="middle" font-size="24" fill="#444">①</text>
+
+  <!-- 2 fetch (record start) -->
+  <circle cx="226" cy="258" r="19" fill="#111"/><text x="226" y="268" text-anchor="middle" font-size="24" fill="#fff">②</text>
+
+  <!-- 3 buffer entry -->
+  <path d="M240,225 L240,154" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+  <circle cx="206" cy="190" r="19" fill="#111"/><text x="206" y="200" text-anchor="middle" font-size="24" fill="#fff">③</text>
+
+  <!-- 4 die queue -->
+  <path d="M460,285 L560,285" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+  <circle cx="510" cy="250" r="19" fill="#111"/><text x="510" y="260" text-anchor="middle" font-size="24" fill="#fff">④</text>
+
+  <!-- 5 NAND read, then data returns to the read cell -->
+  <path d="M700,345 L700,420" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+  <circle cx="745" cy="382" r="19" fill="#111"/><text x="745" y="392" text-anchor="middle" font-size="24" fill="#fff">⑤</text>
+  <path d="M840,465 L866,465 L866,200 L240,200 L240,154" stroke="#111" stroke-width="3.5" fill="none" stroke-dasharray="0" marker-end="url(#a)" opacity="0"/>
+  <path d="M840,465 L868,465 L868,170 L270,170 L270,154" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- 6 DMA buffer -> host -->
+  <path d="M190,127 L126,127" stroke="#111" stroke-width="3.5" fill="none" marker-end="url(#a)"/>
+  <circle cx="158" cy="92" r="19" fill="#111"/><text x="158" y="102" text-anchor="middle" font-size="24" fill="#fff">⑥</text>
+
+  <!-- 7 completion notice (outside, dashed) -->
+  <path d="M190,330 L126,330" stroke="#666" stroke-width="3.5" stroke-dasharray="10 7" fill="none" marker-end="url(#g)"/>
+  <circle cx="158" cy="368" r="19" fill="#fff" stroke="#666" stroke-width="2.5"/><text x="158" y="378" text-anchor="middle" font-size="24" fill="#444">⑦</text>
+  <text x="190" y="404" font-size="21" fill="#444">완료 통지</text>
+
+  <!-- legend -->
+  <line x1="190" y1="578" x2="250" y2="578" stroke="#111" stroke-width="3.5"/>
+  <text x="262" y="587" font-size="22">펌웨어 기록 범위 (②→⑥)</text>
+  <line x1="590" y1="578" x2="650" y2="578" stroke="#666" stroke-width="3.5" stroke-dasharray="10 7"/>
+  <text x="662" y="587" font-size="22" fill="#444">기록 밖 (①, ⑦)</text>
+</svg>
