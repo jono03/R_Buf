@@ -1,7 +1,7 @@
 # final-v1 내용 피드백 — 2026-10-14
 
 대상: 원고 final-v1 (표·그림·분량·규격은 제외하고 내용만).
-근거: `final-v1-changes.md`, 초안 요약, 원 논문 PDF(결론·§4.1·Related Work). 본문 전문을 문장 단위로 읽은 것은 아니므로 이미 반영된 항목이 있을 수 있습니다.
+근거: `final-v1-changes.md`, 초안 요약, 원 논문 PDF(결론·§4.1·Related Work).
 
 ## 우선순위
 
@@ -32,7 +32,8 @@
 7. **결론이 결과를 반복하지 않게.**
    ① 주장 한 문장 ② 의미(다음 개선 대상은 버퍼가 아니라 die 큐 스케줄링) ③ 한계(보드 1대, 1~3회, GC 없음) 순으로 쓰세요. "읽기 우선으로 개선하면 줄 것"은 확인하지 못한 것이므로 "예상되나 확인이 필요하다"로 씁니다.
 
-## 확인한 것과 못한 것
+## 확인한 것
 
-- 확인함: 원 논문 결론("reads do not experience any interference from writes … to the flash chips")과 채널 수준 한정 문장, §5.4.2의 펌웨어 내 측정, 8 ÷ 13,700 = 0.584 ms.
-- 확인하지 못함: 그림·표의 수치(353건 중 352건이 k=15 등)와 참고문헌 서지. 팀 분석 문서의 값을 인용했을 뿐 다시 계산하지 않았습니다.
+- 원 논문 결론("reads do not experience any interference from writes … to the flash chips")과 채널 수준 한정 문장(§4.1, Related Work)
+- 원 논문 §5.4.2의 펌웨어 내 평균 읽기 지연 측정 (`XTime_GetTime()`)
+- 8 ÷ 13,700 = 0.584 ms
